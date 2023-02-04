@@ -1,4 +1,4 @@
-name: Deployment
+name: Testing
 on:
   workflow_dispatch:
   pull_request:
