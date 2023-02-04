@@ -1,0 +1,46 @@
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="generator" content={Astro.generator} />
+        <title>Log in | Create</title>
+    </head>
+    <body>
+        <h1>Astro</h1>
+        <form>
+            <label for="email">
+                <span>Email</span>
+                <input type="email" name="email" id="email" />
+            </label>
+            <button type="submit">Log in</button>
+        </form>
+    </body>
+</html>
+
+<script>
+    const API = "http://localhost:8080/auth/v0/login";
+
+    const form = document.querySelector("form")!;
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(form);
+        const email = formData.get("email") as string;
+
+        const response = await fetch(API, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email }),
+        });
+
+        if (response.ok) {
+            alert("Check your email for a login link");
+        } else {
+            alert("Invalid email");
+        }
+    });
+</script>

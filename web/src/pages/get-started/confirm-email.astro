@@ -1,0 +1,34 @@
+---
+// https://stackoverflow.com/questions/70173939/how-to-get-the-querystring-parameters-with-astro
+
+const API_URL = "http://localhost:8080/auth/v0/login";
+
+// fetch with authorization header
+const response = await fetch(API_URL, {
+    method: "GET",
+    headers: {
+        Authorization: `Bearer ${Astro.url.searchParams.get("token")}`,
+    },
+});
+
+// get response body
+if (response.ok) {
+    console.log("ok");
+} else {
+    console.log("HTTP-Error: " + response.status);
+}
+---
+
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="generator" content={Astro.generator} />
+        <title>Log in | Confirmation</title>
+    </head>
+    <body>
+        <h1>Astro</h1>
+        <p>Email confirmation page</p>
+    </body>
+</html>
