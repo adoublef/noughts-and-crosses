@@ -1,18 +1,6 @@
 version: "3.5"
-
 services:
   nats:
     image: nats:alpine
     ports:
       - 4222:4222
-  # postgres:
-  #   image: postgres:14-alpine
-  #   environment:
-  #     - POSTGRES_USER=${POSTGRES_USER:-postgres}
-  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-  #     - DB_NAME=${POSTGRES_DB:-postgres}
-  #   ports:
-  #     - 5433:5432
-  #   volumes:
-  #     - ./conf/postgres/migration:/docker-entrypoint-initdb.d
-  #   restart: always
