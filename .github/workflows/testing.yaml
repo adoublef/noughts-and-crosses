@@ -1,6 +1,7 @@
 name: Deployment
 on:
   workflow_dispatch:
+    inputs:
   pull_request:
     branches:
       - dev
