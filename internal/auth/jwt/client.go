@@ -9,7 +9,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
-	jok "github.com/hyphengolang/smtp.google/internal/auth/jwt/jwk"
+	jok "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt/jwk"
 )
 
 type ClientOption func(*tokenClient)

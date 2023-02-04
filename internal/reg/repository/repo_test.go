@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hyphengolang/noughts-and-crosses/internal/docker"
+	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
 	"github.com/hyphengolang/prelude/testing/is"
-	"github.com/hyphengolang/smtp.google/internal/docker"
-	repo "github.com/hyphengolang/smtp.google/internal/reg/repository"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

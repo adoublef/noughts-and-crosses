@@ -1,4 +1,4 @@
-module github.com/hyphengolang/smtp.google
+module github.com/hyphengolang/noughts-and-crosses
 
 go 1.19
 

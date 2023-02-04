@@ -3,8 +3,8 @@ package jsonwebkey_test
 import (
 	"testing"
 
+	jok "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt/jwk"
 	"github.com/hyphengolang/prelude/testing/is"
-	jok "github.com/hyphengolang/smtp.google/internal/auth/jwt/jwk"
 )
 
 func TestGeneratePair(t *testing.T) {

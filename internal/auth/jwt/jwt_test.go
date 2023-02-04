@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	jot "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt"
+	jok "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt/jwk"
 	"github.com/hyphengolang/prelude/testing/is"
-	jot "github.com/hyphengolang/smtp.google/internal/auth/jwt"
-	jok "github.com/hyphengolang/smtp.google/internal/auth/jwt/jwk"
 )
 
 func TestGenerateToken(t *testing.T) {

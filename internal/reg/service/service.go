@@ -6,10 +6,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/hyphengolang/smtp.google/internal/events"
-	"github.com/hyphengolang/smtp.google/internal/reg"
-	repo "github.com/hyphengolang/smtp.google/internal/reg/repository"
-	"github.com/hyphengolang/smtp.google/internal/service"
+	"github.com/hyphengolang/noughts-and-crosses/internal/events"
+	"github.com/hyphengolang/noughts-and-crosses/internal/reg"
+	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
+	"github.com/hyphengolang/noughts-and-crosses/internal/service"
 	"github.com/jackc/pgx/v5"
 	"github.com/nats-io/nats.go"
 )

@@ -11,9 +11,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/nats-io/nats.go"
 
-	jwt "github.com/hyphengolang/smtp.google/internal/auth/jwt"
-	"github.com/hyphengolang/smtp.google/internal/events"
-	"github.com/hyphengolang/smtp.google/internal/smtp"
+	jwt "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt"
+	"github.com/hyphengolang/noughts-and-crosses/internal/events"
+	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
 )
 
 //go:embed templates/confirmation_email.html

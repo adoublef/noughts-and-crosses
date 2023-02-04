@@ -10,7 +10,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/hyphengolang/smtp.google/internal/docker/options"
+	"github.com/hyphengolang/noughts-and-crosses/internal/docker/options"
 )
 
 // PostgresContainer represents the postgres container type used in the module
