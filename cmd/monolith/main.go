@@ -18,7 +18,7 @@ import (
 
 func run() error {
 	fmt.Print(conf.NATSURI)
-	nc, err := nats.Connect(conf.NATSURI)
+	nc, err := nats.Connect(nats.DefaultURL, nats.Token(conf.NATSToken))
 	if err != nil {
 		return err
 	}
