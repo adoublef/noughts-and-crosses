@@ -6,20 +6,29 @@ import (
 	"strconv"
 )
 
-var PORT int
-var NATSURI string
-var NATSToken string
-var NATSSeed string
-var SMTPHost string
-var SMTPUsername string
-var SMTPPassword string
-var PostgresUsername string
-var PostgresPassword string
-var PostgresDBName string
+var (
+	PORT      int
+	ClientURI string
+
+	NATSURI   string
+	NATSToken string
+	NATSSeed  string
+
+	SMTPHost     string
+	SMTPUsername string
+	SMTPPassword string
+
+	PostgresUsername string
+	PostgresPassword string
+	PostgresDBName   string
+)
 
 func init() {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	flag.IntVar(&PORT, "port", port, "port")
+
+	flag.StringVar(&ClientURI, "client-uri", os.Getenv("CLIENT_URI"), "client uri")
+
 	flag.StringVar(&SMTPHost, "smtp-host", os.Getenv("SMTP_HOST"), "smtp host")
 	flag.StringVar(&SMTPUsername, "smtp-username", os.Getenv("SMTP_EMAIL"), "smtp username")
 	flag.StringVar(&SMTPPassword, "smtp-password", os.Getenv("SMTP_PASS"), "smtp password")

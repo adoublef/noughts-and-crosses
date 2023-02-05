@@ -4,6 +4,7 @@ package service
 
 import (
 	"embed"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	jwt "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt"
+	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
 )
@@ -104,10 +106,8 @@ func (s *Service) handleSendConfirmation() nats.MsgHandler {
 			// Body: html,
 		}
 
-		// NOTE should handle error here
-		_ = render(mail, &email{
-			Href: "http://localhost:3000/get-started/confirm-email?token=" + token.String(),
-		})
+		href := fmt.Sprintf("%s/get-started/confirm-email?token=%s", conf.ClientURI, token.String())
+		_ = render(mail, &email{Href: href})
 
 		if err := s.smtp.Send(mail); err != nil {
 			log.Printf("sending email error: %v", err)
