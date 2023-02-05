@@ -77,6 +77,7 @@ func ParseRequest(r *http.Request, key jwk.Key) (jwt.Token, error) {
 	default:
 		return nil, errors.New(`unsupported encryption`)
 	}
+
 	return jwt.ParseRequest(r, sep)
 }
 

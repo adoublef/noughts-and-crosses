@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 
 	jwt "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt"
@@ -35,7 +36,7 @@ var _ http.Handler = (*Service)(nil)
 
 type Service struct {
 	mux  chi.Router
-	smtp smtp.Sender
+	smtp smtp.Mailer
 	e    events.Broker
 }
 
@@ -43,7 +44,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-func New(smtp smtp.Sender, nc *nats.Conn) *Service {
+func New(smtp smtp.Mailer, nc *nats.Conn) *Service {
 	s := &Service{
 		mux:  chi.NewRouter(),
 		smtp: smtp,
@@ -55,7 +56,7 @@ func New(smtp smtp.Sender, nc *nats.Conn) *Service {
 }
 
 func (s *Service) listen() {
-	s.e.Subscribe(events.EventUserLogin.String(), s.handleSendConfirmation())
+	s.e.Subscribe(events.EventUserLogin, s.handleSendConfirmation())
 }
 
 func (s *Service) handleSendConfirmation() nats.MsgHandler {
@@ -64,8 +65,16 @@ func (s *Service) handleSendConfirmation() nats.MsgHandler {
 		log.Fatal(err)
 	}
 
-	newToken := func(msg *nats.Msg) (jwt.Token, error) {
-		rawToken, err := s.e.Request(events.EventTokenGenerate.String(), msg.Data, 5*time.Second)
+	type Q struct {
+		Email string
+	}
+
+	type email struct {
+		Href string
+	}
+
+	newToken := func(q Q) (jwt.Token, error) {
+		rawToken, err := s.e.Request(events.EventTokenGenerate, q, 5*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -74,37 +83,38 @@ func (s *Service) handleSendConfirmation() nats.MsgHandler {
 		return token, s.e.Decode(rawToken, &token)
 	}
 
-	type R struct {
-		Href string
-	}
-
 	return func(msg *nats.Msg) {
-		token, err := newToken(msg)
+		var q Q
+		if err := s.e.Decode(msg.Data, &q); err != nil {
+			// return error to producer
+			log.Printf("mailing.service: decode error: %v", err)
+			return
+		}
+
+		// generate token
+		token, err := newToken(q)
 		if err != nil {
 			log.Printf("request token error: %v", err)
 			return
 		}
 
+		mail := &smtp.Mail{
+			To:   []string{q.Email},
+			Subj: "Confirm your email for your account: " + uuid.New().String(),
+			// Body: html,
+		}
+
 		// NOTE should handle error here
-		html, _ := render("Confirm your email for your account", &R{
+		_ = render(mail, &email{
 			Href: "http://localhost:3000/get-started/confirm-email?token=" + token.String(),
 		})
 
-		var m struct {
-			Email string
-		}
-		if err := s.e.Decode(msg.Data, &m); err != nil {
-			// return error to producer
-			log.Printf("decode error: %v", err)
-			return
-		}
-
-		if err := s.smtp.Send(html, m.Email); err != nil {
+		if err := s.smtp.Send(mail); err != nil {
 			log.Printf("sending email error: %v", err)
 			return
 		}
 
-		log.Printf("email sent to %s", m.Email)
+		log.Printf("email sent to %s", q.Email)
 	}
 }
 

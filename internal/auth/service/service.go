@@ -60,7 +60,7 @@ func (s *Service) handleLogin() http.HandlerFunc {
 			return
 		}
 
-		if err := s.e.Publish(events.EventUserLogin.String(), q); err != nil {
+		if err := s.e.Publish(events.EventUserLogin, q); err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
@@ -72,11 +72,14 @@ func (s *Service) handleLogin() http.HandlerFunc {
 
 func (s *Service) handleVerify() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_, err := s.tk.ParseRequest(r)
+		tk, err := s.tk.ParseRequest(r)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
 		}
+
+		// verify with short lived cookie that holds value of token
+		_ = tk.Subject() // email of user
 
 		s.m.Respond(w, r, nil, http.StatusOK)
 	}
@@ -95,11 +98,21 @@ func (s *Service) handleRefreshToken() http.HandlerFunc {
 }
 
 func (s *Service) listen() {
-	s.e.Subscribe(events.EventTokenGenerate.String(), s.handleTokenGenerate())
+	s.e.Subscribe(events.EventTokenGenerate, s.handleTokenGenerate())
 }
 
 func (s *Service) handleTokenGenerate() nats.MsgHandler {
+	type Q struct {
+		Email string
+	}
+
 	return func(msg *nats.Msg) {
+		var q Q
+		if err := s.e.Decode(msg.Data, &q); err != nil {
+			log.Printf("auth.service: decode error: %v", err)
+			return
+		}
+
 		tk, err := s.tk.GenerateToken(context.Background(), 30*time.Second, uuid.New().String())
 		if err != nil {
 			log.Println(err)

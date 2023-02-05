@@ -8,27 +8,13 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-type Event int
+type Event string
 
 const (
-	EventUnknown Event = iota
-	EventUserLogin
-	EventTokenGenerate
-	EventTokenVerify
+	EventUserLogin     = "user.login"
+	EventTokenGenerate = "token.generate"
+	EventTokenVerify   = "token.verify"
 )
-
-func (e Event) String() string {
-	switch e {
-	case EventUserLogin:
-		return "user.login"
-	case EventTokenGenerate:
-		return "token.generate"
-	case EventTokenVerify:
-		return "token.verify"
-	default:
-		return "unknown"
-	}
-}
 
 type Broker interface {
 	Encode(v any) ([]byte, error)

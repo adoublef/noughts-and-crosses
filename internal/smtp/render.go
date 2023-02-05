@@ -1,35 +1,33 @@
 package smtp
 
 import (
-	"fmt"
+	"bytes"
 	"html/template"
 	"io/fs"
-	"strings"
 	"sync"
 )
 
 // Rendering
-type RenderFunc func(subject string, data any) ([]byte, error)
+type RenderFunc func(m *Mail, data any) error
 
 func Render(fs fs.FS, filenames ...string) (render RenderFunc, err error) {
 	var (
 		init sync.Once
 
 		tpl *template.Template
-		sb  *strings.Builder
+		sb  *bytes.Buffer
 	)
 
 	init.Do(func() { tpl, err = template.ParseFS(fs, filenames...) })
 
-	render = func(subject string, data any) ([]byte, error) {
-		sb = &strings.Builder{}
+	render = func(m *Mail, data any) error {
+		sb = &bytes.Buffer{}
 		if err = tpl.Execute(sb, data); err != nil {
-			return nil, err
+			return err
 		}
 
-		s := fmt.Sprintf("Subject: %s\nMIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n%s", subject, sb.String())
-
-		return []byte(s), nil
+		m.Body = sb.Bytes()
+		return nil
 	}
 
 	return
