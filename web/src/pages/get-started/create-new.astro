@@ -19,6 +19,11 @@
 </html>
 
 <script>
+    // https://noughts-and-crosses-dev.up.railway.app
+    // const API = "http://localhost:8080/auth/v0/login";
+
+    import { login } from "../../lib/agent";
+
     const form = document.querySelector("form")!;
 
     form.addEventListener("submit", async (event) => {
@@ -27,16 +32,7 @@
         const formData = new FormData(form);
         const email = formData.get("email") as string;
 
-        const response = await fetch(
-            `${import.meta.env.API_URI}/auth/v0/login`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ email }),
-            }
-        );
+        const response = await login(email);
 
         if (response.ok) {
             alert("Check your email for a login link");
