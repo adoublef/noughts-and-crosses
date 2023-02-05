@@ -35,8 +35,8 @@ func run() error {
 	asv := newAuthService(nc)
 	mux.Mount("/auth/v0", asv)
 
-	log.Printf("Listening on 0.0.0.0:%d\n", conf.PORT)
-	return http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", conf.PORT), mux)
+	// return http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", conf.PORT), mux)
+	return http.ListenAndServe(fmt.Sprintf(":%d", conf.PORT), mux)
 }
 
 func main() {

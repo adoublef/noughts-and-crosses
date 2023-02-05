@@ -113,7 +113,7 @@ func (s *Service) handleTokenGenerate() nats.MsgHandler {
 			return
 		}
 
-		tk, err := s.tk.GenerateToken(context.Background(), 30*time.Second, uuid.New().String())
+		tk, err := s.tk.GenerateToken(context.Background(), 5*time.Minute, uuid.New().String())
 		if err != nil {
 			log.Println(err)
 			return
