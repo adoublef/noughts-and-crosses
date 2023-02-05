@@ -11,12 +11,7 @@ const response = await fetch(`${API_URI}/auth/v0/login`, {
     // mode: "no-cors",
 });
 
-// get response body
-if (response.ok) {
-    console.log("ok");
-} else {
-    console.log("HTTP-Error: " + response.status);
-}
+let authorized = response.ok ? true : false;
 ---
 
 <html lang="en">
@@ -29,6 +24,6 @@ if (response.ok) {
     </head>
     <body>
         <h1>Astro</h1>
-        <p>Email confirmation page</p>
+        {authorized ? <p>Authorized</p> : <p>Not authorized</p>}
     </body>
 </html>
