@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -16,6 +17,7 @@ import (
 )
 
 func run() error {
+	fmt.Print(conf.NATSURI)
 	nc, err := nats.Connect(conf.NATSURI)
 	if err != nil {
 		return err
@@ -35,7 +37,7 @@ func run() error {
 	mux.Mount("/auth/v0", asv)
 
 	log.Println("Listening on port 8080")
-	return http.ListenAndServe(":8080", mux)
+	return http.ListenAndServe("0.0.0.0:8080", mux)
 }
 
 func main() {
@@ -46,7 +48,8 @@ func main() {
 
 // example: POST http://localhost:8080/mailing/v0/send
 func newMailingService(nc *nats.Conn) *mail.Service {
-	e := smtp.NewClient(conf.SMTPHost, conf.SMTPUsername, conf.SMTPPassword)
+	// do not hard-code SMTP Port
+	e := smtp.NewMailer(conf.SMTPUsername, conf.SMTPPassword, conf.SMTPHost, 587)
 	srv := mail.New(e, nc)
 
 	return srv
