@@ -2,10 +2,7 @@ package conf
 
 import (
 	"flag"
-	"log"
 	"os"
-
-	env "github.com/joho/godotenv"
 )
 
 var SMTPHost string
@@ -17,10 +14,6 @@ var PostgresPassword string
 var PostgresDBName string
 
 func init() {
-	if err := env.Load(); err != nil {
-		log.Fatalln(err)
-	}
-
 	flag.StringVar(&SMTPHost, "smtp-host", os.Getenv("SMTP_HOST"), "smtp host")
 	flag.StringVar(&SMTPUsername, "smtp-username", os.Getenv("SMTP_EMAIL"), "smtp username")
 	flag.StringVar(&SMTPPassword, "smtp-password", os.Getenv("SMTP_PASS"), "smtp password")

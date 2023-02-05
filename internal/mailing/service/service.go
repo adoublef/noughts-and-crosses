@@ -65,8 +65,16 @@ func (s *Service) handleSendConfirmation() nats.MsgHandler {
 		log.Fatal(err)
 	}
 
-	newToken := func(msg *nats.Msg) (jwt.Token, error) {
-		rawToken, err := s.e.Request(events.EventTokenGenerate, msg.Data, 5*time.Second)
+	type Q struct {
+		Email string
+	}
+
+	type email struct {
+		Href string
+	}
+
+	newToken := func(q Q) (jwt.Token, error) {
+		rawToken, err := s.e.Request(events.EventTokenGenerate, q, 5*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -75,31 +83,23 @@ func (s *Service) handleSendConfirmation() nats.MsgHandler {
 		return token, s.e.Decode(rawToken, &token)
 	}
 
-	type request struct {
-		Email string
-	}
-
-	type email struct {
-		Href string
-	}
-
 	return func(msg *nats.Msg) {
-		var req request
-		if err := s.e.Decode(msg.Data, &req); err != nil {
+		var q Q
+		if err := s.e.Decode(msg.Data, &q); err != nil {
 			// return error to producer
-			log.Printf("decode error: %v", err)
+			log.Printf("mailing.service: decode error: %v", err)
 			return
 		}
 
 		// generate token
-		token, err := newToken(msg)
+		token, err := newToken(q)
 		if err != nil {
 			log.Printf("request token error: %v", err)
 			return
 		}
 
 		mail := &smtp.Mail{
-			To:   []string{req.Email},
+			To:   []string{q.Email},
 			Subj: "Confirm your email for your account: " + uuid.New().String(),
 			// Body: html,
 		}
@@ -114,7 +114,7 @@ func (s *Service) handleSendConfirmation() nats.MsgHandler {
 			return
 		}
 
-		log.Printf("email sent to %s", req.Email)
+		log.Printf("email sent to %s", q.Email)
 	}
 }
 

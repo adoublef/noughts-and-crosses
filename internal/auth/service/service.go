@@ -60,7 +60,7 @@ func (s *Service) handleLogin() http.HandlerFunc {
 			return
 		}
 
-		if err := s.e.Publish(events.EventUserLogin, q.Email); err != nil {
+		if err := s.e.Publish(events.EventUserLogin, q); err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
@@ -105,10 +105,11 @@ func (s *Service) handleTokenGenerate() nats.MsgHandler {
 	type Q struct {
 		Email string
 	}
+
 	return func(msg *nats.Msg) {
 		var q Q
 		if err := s.e.Decode(msg.Data, &q); err != nil {
-			log.Println(err)
+			log.Printf("auth.service: decode error: %v", err)
 			return
 		}
 
