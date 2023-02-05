@@ -19,7 +19,9 @@
 </html>
 
 <script>
-    const API = "http://localhost:8080/auth/v0/login";
+    const API_URI = `https://noughts-and-crosses-production.up.railway.app`;
+    // const response = await fetch(`${API_URI}/auth/v0/login`, {
+    // const API = "http://localhost:8080/auth/v0/login";
 
     const form = document.querySelector("form")!;
 
@@ -29,7 +31,7 @@
         const formData = new FormData(form);
         const email = formData.get("email") as string;
 
-        const response = await fetch(API, {
+        const response = await fetch(`${API_URI}/auth/v0/login`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

@@ -1,20 +1,22 @@
 ---
 // https://stackoverflow.com/questions/70173939/how-to-get-the-querystring-parameters-with-astro
-
 // // fetch with authorization header
-// const response = await fetch(import.meta.env.API_URI, {
-//     method: "GET",
-//     headers: {
-//         Authorization: `Bearer ${Astro.url.searchParams.get("token")}`,
-//     },
-// });
+const API_URI = `https://noughts-and-crosses-production.up.railway.app`;
+const response = await fetch(`${API_URI}/auth/v0/login`, {
+    method: "GET",
+    headers: {
+        Authorization: `Bearer ${Astro.url.searchParams.get("token")}`,
+    },
+    // credentials: "include",
+    // mode: "no-cors",
+});
 
-// // get response body
-// if (response.ok) {
-//     console.log("ok");
-// } else {
-//     console.log("HTTP-Error: " + response.status);
-// }
+// get response body
+if (response.ok) {
+    console.log("ok");
+} else {
+    console.log("HTTP-Error: " + response.status);
+}
 ---
 
 <html lang="en">
