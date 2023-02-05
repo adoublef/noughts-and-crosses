@@ -19,10 +19,6 @@
 </html>
 
 <script>
-    const API_URI = `https://noughts-and-crosses-production.up.railway.app`;
-    // const response = await fetch(`${API_URI}/auth/v0/login`, {
-    // const API = "http://localhost:8080/auth/v0/login";
-
     const form = document.querySelector("form")!;
 
     form.addEventListener("submit", async (event) => {
@@ -31,13 +27,16 @@
         const formData = new FormData(form);
         const email = formData.get("email") as string;
 
-        const response = await fetch(`${API_URI}/auth/v0/login`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ email }),
-        });
+        const response = await fetch(
+            `${import.meta.env.API_URI}/auth/v0/login`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ email }),
+            }
+        );
 
         if (response.ok) {
             alert("Check your email for a login link");
