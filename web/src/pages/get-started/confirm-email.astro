@@ -1,10 +1,8 @@
 ---
 // https://stackoverflow.com/questions/70173939/how-to-get-the-querystring-parameters-with-astro
 
-const API_URL = "http://localhost:8080/auth/v0/login";
-
 // fetch with authorization header
-const response = await fetch(API_URL, {
+const response = await fetch(import.meta.env.API_URI, {
     method: "GET",
     headers: {
         Authorization: `Bearer ${Astro.url.searchParams.get("token")}`,
