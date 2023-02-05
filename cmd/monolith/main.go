@@ -17,8 +17,7 @@ import (
 )
 
 func run() error {
-	fmt.Print(conf.NATSURI)
-	nc, err := nats.Connect(nats.DefaultURL, nats.Token(conf.NATSToken))
+	nc, err := nats.Connect(conf.NATSURI, nats.UserJWTAndSeed(conf.NATSToken, conf.NATSSeed))
 	if err != nil {
 		return err
 	}
@@ -36,8 +35,8 @@ func run() error {
 	asv := newAuthService(nc)
 	mux.Mount("/auth/v0", asv)
 
-	log.Println("Listening on port 8080")
-	return http.ListenAndServe("0.0.0.0:8080", mux)
+	log.Printf("Listening on 0.0.0.0:%d\n", conf.PORT)
+	return http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", conf.PORT), mux)
 }
 
 func main() {
