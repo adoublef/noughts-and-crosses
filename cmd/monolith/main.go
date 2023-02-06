@@ -6,12 +6,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	jsonwebtoken "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt"
 	auth "github.com/hyphengolang/noughts-and-crosses/internal/auth/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
 	mail "github.com/hyphengolang/noughts-and-crosses/internal/mailing/service"
 	reg "github.com/hyphengolang/noughts-and-crosses/internal/reg/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
+	jsonwebtoken "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
 	"github.com/nats-io/nats.go"
 	"github.com/rs/cors"
 )

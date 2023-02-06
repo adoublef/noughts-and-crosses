@@ -3,7 +3,7 @@ package jsonwebkey_test
 import (
 	"testing"
 
-	jok "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt/jwk"
+	jok "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt/jwk"
 	"github.com/hyphengolang/prelude/testing/is"
 )
 
