@@ -19,26 +19,20 @@
 </html>
 
 <script>
+    import { Auth } from "../../lib/agent";
+
     const form = document.querySelector("form")!;
 
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
 
-        const formData = new FormData(form);
-        const email = formData.get("email") as string;
+        const email = (new FormData(form).get("email") || "").toString();
 
-        const response = await fetch(
-            `${import.meta.env.API_URI}/auth/v0/login`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ email }),
-            }
-        );
+        const response = await Auth.login(email);
 
         if (response.ok) {
+            const body = await response.json();
+            console.log(body);
             alert("Check your email for a login link");
         } else {
             alert("Invalid email");

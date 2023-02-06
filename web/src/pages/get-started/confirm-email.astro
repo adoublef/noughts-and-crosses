@@ -1,11 +1,7 @@
 ---
-const response = await fetch(`${import.meta.env.API_URI}/auth/v0/login`, {
-    method: "GET",
-    headers: {
-        Authorization: `Bearer ${Astro.url.searchParams.get("token")}`,
-    },
-});
+import { Auth } from "../../lib/agent";
 
+const response = await Auth.verify(Astro.url.searchParams.get("token"));
 let authorized = response.ok ? true : false;
 ---
 
