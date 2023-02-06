@@ -16,33 +16,8 @@ var (
 	aud = []string{"client_a"}
 )
 
-func GenerateToken(ctx context.Context, key jwk.Key, start, end time.Duration, subject string) (Token, error) {
-	tk, err := jwt.NewBuilder().
-		Issuer(iss).
-		IssuedAt(time.Now()).
-		NotBefore(time.Now().Add(start)).
-		Expiration(time.Now().Add(end)).
-		Subject(subject).
-		Audience(aud).
-		// NOTE - per device authentication
-		// JwtID(uuid.New().String()).
-		Build()
-
-	if err != nil {
-		return nil, err
-	}
-
-	var sep jwt.SignEncryptParseOption
-	switch key := key.(type) {
-	case jwk.RSAPrivateKey:
-		sep = jwt.WithKey(jwa.RS256, key)
-	case jwk.ECDSAPrivateKey:
-		sep = jwt.WithKey(jwa.ES256, key)
-	default:
-		return nil, errors.New(`unsupported encryption`)
-	}
-
-	return jwt.Sign(tk, sep)
+func GenerateToken(ctx context.Context, key jwk.Key, opts ...BuildOption) (Token, error) {
+	return Build(key, opts...)
 }
 
 // ParseRequest parses the request and returns the token
@@ -62,6 +37,11 @@ func Sign(tk jwt.Token, key jwk.Key) (Token, error) {
 }
 
 type Token []byte
+
+// Deprecated
+func (t Token) Decode() (jwt.Token, error) {
+	return jwt.ParseInsecure(t)
+}
 
 func (t Token) String() string { return string(t) }
 
@@ -98,4 +78,67 @@ func ParseCookie(r *http.Request, key jwk.Key, cookieName string) (jwt.Token, er
 	}
 
 	return jwt.Parse([]byte(c.Value), sep)
+}
+
+type BuildOption func(*jwt.Builder)
+
+func WithEnd(d time.Duration) BuildOption {
+	return func(b *jwt.Builder) {
+		b.Expiration(time.Now().Add(d))
+	}
+}
+
+func WithStart(d time.Duration) BuildOption {
+	return func(b *jwt.Builder) {
+		b.NotBefore(time.Now().Add(d))
+	}
+}
+
+func WithID(id string) BuildOption {
+	return func(b *jwt.Builder) {
+		b.JwtID(id)
+	}
+}
+
+func WithSubject(sub string) BuildOption {
+	return func(b *jwt.Builder) {
+		b.Subject(sub)
+	}
+}
+
+func WithPrivateClaims(claims PrivateClaims) BuildOption {
+	return func(b *jwt.Builder) {
+		for k, v := range claims {
+			b.Claim(k, v)
+		}
+	}
+}
+
+type PrivateClaims map[string]any
+
+func Build(key jwk.Key, opts ...BuildOption) ([]byte, error) {
+	iss := "https://example.com"
+	aud := []string{"https://example.com"}
+
+	b := jwt.NewBuilder().Issuer(iss).Audience(aud).IssuedAt(time.Now())
+	for _, opt := range opts {
+		opt(b)
+	}
+
+	tk, err := b.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	var sep jwt.SignEncryptParseOption
+	switch key := key.(type) {
+	case jwk.RSAPrivateKey:
+		sep = jwt.WithKey(jwa.RS256, key)
+	case jwk.ECDSAPrivateKey:
+		sep = jwt.WithKey(jwa.ES256, key)
+	default:
+		return nil, errors.New(`unsupported encryption`)
+	}
+
+	return jwt.Sign(tk, sep)
 }

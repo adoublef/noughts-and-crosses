@@ -7,13 +7,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 
-	jwt "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt"
 	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
@@ -57,68 +54,53 @@ func New(smtp smtp.Mailer, nc *nats.Conn) *Service {
 	return s
 }
 
+func (s *Service) routes() {
+	// s.mux.Post("/send", s.handleSend())
+}
+
 func (s *Service) listen() {
 	s.e.Subscribe(events.EventUserLogin, s.handleSendConfirmation())
 }
 
 func (s *Service) handleSendConfirmation() nats.MsgHandler {
+	type renderArgs struct {
+		Href string
+	}
+
 	render, err := smtp.Render(confirmationEmail, "templates/confirmation_email.html")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	type Q struct {
-		Email string
-	}
-
-	type email struct {
-		Href string
-	}
-
-	newToken := func(q Q) (jwt.Token, error) {
-		rawToken, err := s.e.Request(events.EventTokenGenerate, q, 5*time.Second)
-		if err != nil {
-			return nil, err
-		}
-
-		var token jwt.Token
-		return token, s.e.Decode(rawToken, &token)
-	}
-
 	return func(msg *nats.Msg) {
-		var q Q
-		if err := s.e.Decode(msg.Data, &q); err != nil {
-			// return error to producer
-			log.Printf("mailing.service: decode error: %v", err)
-			return
+		// EventUserLoginResponse
+		var data struct {
+			Email string
+			Token []byte
 		}
-
-		// generate token
-		token, err := newToken(q)
-		if err != nil {
-			log.Printf("request token error: %v", err)
-			return
+		{
+			if err := events.Decode(msg.Data, &data); err != nil {
+				log.Println(err)
+				return
+			}
 		}
-
-		// token.String()
 
 		mail := &smtp.Mail{
-			To:   []string{q.Email},
-			Subj: "Confirm your email for your account: " + uuid.New().String(),
+			To:   []string{data.Email},
+			Subj: "Confirm your email for your account",
 		}
 
-		href := fmt.Sprintf("%s/get-started/confirm-email?token=%s", conf.ClientURI, token.String())
-		_ = render(mail, &email{Href: href})
+		args := &renderArgs{
+			Href: fmt.Sprintf("%s/get-started/confirm-email?token=%s", conf.ClientURI, string(data.Token)),
+		}
+
+		_ = render(mail, args)
 
 		if err := s.smtp.Send(mail); err != nil {
 			log.Printf("sending email error: %v", err)
 			return
 		}
 
-		log.Printf("email sent to %s", q.Email)
+		log.Printf("email sent to %s", data.Email)
 	}
-}
-
-func (s *Service) routes() {
-	// s.mux.Post("/send", s.handleSend())
 }

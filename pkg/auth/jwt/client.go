@@ -4,12 +4,11 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
-	jok "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt/jwk"
+	jok "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt/jwk"
 )
 
 type ClientOption func(*tokenClient)
@@ -33,7 +32,7 @@ type TokenClient interface {
 	ParseCookie(r *http.Request, cookieName string) (jwt.Token, error)
 	// GenerateToken generates a token with the given duration
 	// and subject. The token is signed with the key provided
-	GenerateToken(ctx context.Context, duration time.Duration, subject string) (Token, error)
+	GenerateToken(ctx context.Context, opts ...BuildOption) (Token, error)
 	// BlacklistToken blacklists the token
 	BlacklistToken(ctx context.Context, token jwt.Token) error
 }
@@ -67,8 +66,8 @@ func (c *tokenClient) ParseCookie(r *http.Request, cookieName string) (jwt.Token
 }
 
 // GenerateToken implements TokenClient
-func (c *tokenClient) GenerateToken(ctx context.Context, duration time.Duration, subject string) (Token, error) {
-	return GenerateToken(ctx, c.key, 0, duration, subject)
+func (c *tokenClient) GenerateToken(ctx context.Context, opts ...BuildOption) (Token, error) {
+	return GenerateToken(ctx, c.key, opts...)
 }
 
 func NewTokenClient(opts ...ClientOption) TokenClient {
