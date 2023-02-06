@@ -100,10 +100,11 @@ func (s *Service) handleSendConfirmation() nats.MsgHandler {
 			return
 		}
 
+		// token.String()
+
 		mail := &smtp.Mail{
 			To:   []string{q.Email},
 			Subj: "Confirm your email for your account: " + uuid.New().String(),
-			// Body: html,
 		}
 
 		href := fmt.Sprintf("%s/get-started/confirm-email?token=%s", conf.ClientURI, token.String())

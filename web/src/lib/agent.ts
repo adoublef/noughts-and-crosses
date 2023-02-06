@@ -1,20 +1,35 @@
-// Helper for REST API calls
-export function send() { }
+export const Auth = {
+    /** I should be able to return the response body of the request in a type-safe way */
+    verify: (token: string | null = "") => send("get", "/auth/v0/login", undefined, { Authorization: `Bearer ${token}` }),
+    /** I should be able to return the response body of the request in a type-safe way */
+    login: (email: string) => send("post", "/auth/v0/login", { email }),
+};
 
-export async function confirmEmail(token: string | null) {
-    return fetch(
-        `${import.meta.env.PUBLIC_API_URI}/auth/v0/login`,
-        { headers: { Authorization: `Bearer ${token}` } }
-    );
+/** 
+ * Does not throw an error, instead returns a 500 response
+ * My API should always return a json object, then can clean this up
+ */
+async function send(method: "post" | "get", url: string, payload?: any, headers: Record<string, string> = {}) {
+    let opts: RequestInit = { method, headers };
+
+    if (payload) {
+        headers["Content-Type"] = "application/json";
+        opts.body = JSON.stringify(payload);
+    }
+
+    try {
+        return fetch(import.meta.env.PUBLIC_API_URI + url, opts);
+    } catch (err) {
+        return new Response(null, { status: 500 });
+    }
 }
 
-export async function login(email: string) {
-    return fetch(
-        `${import.meta.env.PUBLIC_API_URI}/auth/v0/login`,
-        {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-        }
-    );
+async function parse<T extends Record<string, any>>(promise: Promise<Response>) {
+    const res = await promise;
+    switch (res.status) {
+        case 204:
+            return null;
+        default:
+            return res.json() as Promise<T>;
+    }
 }

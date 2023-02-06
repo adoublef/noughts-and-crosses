@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 
 	jwt "github.com/hyphengolang/noughts-and-crosses/internal/auth/jwt"
@@ -39,8 +39,10 @@ func New(nc *nats.Conn, tk jwt.TokenClient) *Service {
 
 func (s *Service) routes() {
 	s.m.Post("/login", s.handleLogin())
-	s.m.Get("/login", s.handleVerify())
 	s.m.Delete("/login", s.handleLogout())
+	// should rename to `/login/verify` to
+	// avoid confusion or `/token/verify`
+	s.m.Get("/login", s.handleVerify())
 
 	s.m.Get("/token", s.handleRefreshToken())
 }
@@ -65,6 +67,8 @@ func (s *Service) handleLogin() http.HandlerFunc {
 			return
 		}
 
+		fmt.Println("published event")
+
 		p := P{Message: "check emails for confirmation"}
 		s.m.Respond(w, r, p, http.StatusOK)
 	}
@@ -72,14 +76,17 @@ func (s *Service) handleLogin() http.HandlerFunc {
 
 func (s *Service) handleVerify() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tk, err := s.tk.ParseRequest(r)
+		_, err := s.tk.ParseRequest(r)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
 		}
 
+		// check email is in database return a pointer to a user
+		// client can then deal with redirecting to dashboard or profile creation page
+
 		// verify with short lived cookie that holds value of token
-		_ = tk.Subject() // email of user
+		// _ = tk.Subject() // email of user
 
 		s.m.Respond(w, r, nil, http.StatusOK)
 	}
@@ -113,7 +120,7 @@ func (s *Service) handleTokenGenerate() nats.MsgHandler {
 			return
 		}
 
-		tk, err := s.tk.GenerateToken(context.Background(), 5*time.Minute, uuid.New().String())
+		tk, err := s.tk.GenerateToken(context.Background(), 5*time.Minute, q.Email)
 		if err != nil {
 			log.Println(err)
 			return
@@ -124,6 +131,6 @@ func (s *Service) handleTokenGenerate() nats.MsgHandler {
 			return
 		}
 
-		log.Println("token generated")
+		log.Printf("token generated: %s", q.Email)
 	}
 }

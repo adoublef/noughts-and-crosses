@@ -1,8 +1,7 @@
 ---
-import { confirmEmail } from "../../lib/agent";
+import { Auth } from "../../lib/agent";
 
-const response = await confirmEmail(Astro.url.searchParams.get("token"));
-
+const response = await Auth.verify(Astro.url.searchParams.get("token"));
 let authorized = response.ok ? true : false;
 ---
 
