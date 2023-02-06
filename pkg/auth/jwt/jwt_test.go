@@ -8,7 +8,6 @@ import (
 	jot "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
 	jok "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt/jwk"
 	"github.com/hyphengolang/prelude/testing/is"
-	"github.com/lestrrat-go/jwx/v2/jwk"
 )
 
 func TestGenerateToken(t *testing.T) {
@@ -24,9 +23,10 @@ func TestGenerateToken(t *testing.T) {
 func TestToken(t *testing.T) {
 	is := is.New(t)
 
+	key, err := jok.ES256Key(nil)
+	is.NoErr(err) // unable to generate jwt key from raw
 	// token, err := Build(jwk.ES256(), WithStart(time.Minute), WithEnd(time.Minute), WithID("foo"))
 
-	var key jwk.Key
 	token, err := jot.Build(key,
 		jot.WithEnd(time.Minute),
 		jot.WithPrivateClaims(jot.PrivateClaims{
