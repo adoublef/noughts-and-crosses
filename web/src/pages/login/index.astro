@@ -1,0 +1,45 @@
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="generator" content={Astro.generator} />
+        <title>Login | Create</title>
+    </head>
+    <body>
+        <h1>Astro</h1>
+
+        <h2>Log in</h2>
+        <form id="login">
+            <label for="email">
+                <span>Email</span>
+                <input type="email" name="email" id="email" />
+            </label>
+            <button type="submit">Log in</button>
+        </form>
+
+        <a href="/signup">Create an account?</a>
+    </body>
+</html>
+
+<script>
+    import { Auth } from "../../lib/agent";
+
+    document
+        .querySelector<HTMLFormElement>("#login")
+        ?.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const email = (new FormData(this).get("email") || "").toString();
+
+            const response = await Auth.login(email);
+
+            if (response.ok) {
+                const body = await response.json();
+                console.log(body);
+                alert("Check your email for a login link");
+            } else {
+                alert("Invalid email");
+            }
+        });
+</script>

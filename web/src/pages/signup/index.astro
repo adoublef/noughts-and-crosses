@@ -1,0 +1,59 @@
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="generator" content={Astro.generator} />
+        <title>Signup | Create</title>
+    </head>
+    <body>
+        <h1>Astro</h1>
+
+        <h2>Sign up</h2>
+        <form id="signup">
+            <label for="email">
+                <span>Email</span>
+                <input type="email" name="email" id="email" />
+            </label>
+            <label for="username">
+                <span>Username</span>
+                <input type="text" name="username" id="username" />
+            </label>
+            <button type="submit">Sign up</button>
+        </form>
+
+        <a href="/login">Already registered?</a>
+    </body>
+</html>
+
+<script>
+    import { Auth } from "../../lib/agent";
+
+    document
+        .querySelector<HTMLFormElement>("#signup")
+        ?.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const email = (new FormData(this).get("email") || "").toString();
+            const username = (
+                new FormData(this).get("username") || ""
+            ).toString();
+
+            const response = await Auth.signup(email, username);
+
+            switch (response.status) {
+                case 202:
+                    const body = await response.json();
+                    alert(
+                        "Check your email for a account registration confirmation"
+                    );
+                    break;
+                case 400:
+                    alert("Invalid email or username");
+                    break;
+                default:
+                    alert("Unknown error");
+                    break;
+            }
+        });
+</script>

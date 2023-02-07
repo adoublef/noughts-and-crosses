@@ -1,8 +1,11 @@
 ---
-import { Auth } from "../../lib/agent";
+type Props = {
+    name?: string;
+};
 
-const response = await Auth.verify(Astro.url.searchParams.get("token"));
-let authorized = response.ok ? true : false;
+// TODO - token auth is requried to access this page
+
+const { name = "Joe" } = Astro.props;
 ---
 
 <html lang="en">
@@ -11,10 +14,9 @@ let authorized = response.ok ? true : false;
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="viewport" content="width=device-width" />
         <meta name="generator" content={Astro.generator} />
-        <title>Log in | Confirmation</title>
+        <title>Noughts & Crosses | Home</title>
     </head>
     <body>
-        <h1>Astro</h1>
-        {authorized ? <p>Authorized</p> : <p>Not authorized</p>}
+        <h1>Welcome {name}</h1>
     </body>
 </html>

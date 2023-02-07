@@ -1,0 +1,21 @@
+---
+import { Auth } from "../../lib/agent";
+
+// either 200 or 401
+const response = await Auth.loginVerify(Astro.url.searchParams.get("token"));
+let authorized = response.ok ? true : false;
+---
+
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="generator" content={Astro.generator} />
+        <title>Login | Confirmation</title>
+    </head>
+    <body>
+        <h1>Astro</h1>
+        {authorized ? <p>Authorized</p> : <p>Not authorized</p>}
+    </body>
+</html>

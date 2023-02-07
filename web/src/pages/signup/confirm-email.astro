@@ -1,6 +1,9 @@
 ---
-// https://slack.com/intl/en-gb/get-started#/createnew
-// https://slack.com/intl/en-gb/get-started#/confirmemail
+import { Auth } from "../../lib/agent";
+
+// either 200 or 401
+const response = await Auth.signupVerify(Astro.url.searchParams.get("token"));
+let authorized = response.ok;
 ---
 
 <html lang="en">
@@ -9,11 +12,10 @@
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="viewport" content="width=device-width" />
         <meta name="generator" content={Astro.generator} />
-        <title>Noughts & Crosses</title>
+        <title>Signup | Confirmation</title>
     </head>
     <body>
-        <h1>Astro with Vercel</h1>
-        <a href="/signup">Signup</a>
-        <a href="/login">Login</a>
+        <h1>Astro</h1>
+        {authorized ? <p>Authorized</p> : <p>Not authorized</p>}
     </body>
 </html>
