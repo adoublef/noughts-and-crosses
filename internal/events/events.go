@@ -11,9 +11,12 @@ import (
 type Event string
 
 const (
-	EventUserLogin     = "user.login"
-	EventTokenGenerate = "token.generate"
-	EventTokenVerify   = "token.verify"
+	EventUserLogin           = "user.email.login"
+	EventUserSignup          = "user.email.signup"
+	EventUserRegister        = "user.registered"
+	EventTokenGenerateLogin  = "token.generate.login"
+	EventTokenGenerateSignUp = "token.generate.signup"
+	EventTokenVerify         = "token.verify"
 )
 
 type Broker interface {
