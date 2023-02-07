@@ -1,5 +1,5 @@
 export const User = {
-    create: (token: string, email: string, username: string, bio?: string) => send("post", "/registry/v0/users", { email, username, bio }, { Authorization: `Bearer ${token}` }),
+    create: (token: string, email: string, username: string, bio?: string) => send<{ location: string; username: string; }>("post", "/registry/v0/users", { email, username, bio }, { Authorization: `Bearer ${token}` }),
 };
 
 export const Auth = {
