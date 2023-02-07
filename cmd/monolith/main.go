@@ -41,7 +41,15 @@ func run() error {
 	}
 
 	mux := chi.NewRouter()
-	mux.Use(cors.Default().Handler)
+
+	mux.Use(cors.New(cors.Options{
+		AllowedOrigins:   []string{conf.ClientURI},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	}).Handler)
 
 	msv := newMailingService(nc)
 	mux.Mount("/mail/v0", msv)
