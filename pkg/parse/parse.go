@@ -1,6 +1,10 @@
 package parse
 
-import "strings"
+import (
+	"fmt"
+	"net/http"
+	"strings"
+)
 
 // https://email-verify.my-addr.com/list-of-most-popular-email-domains.php
 //
@@ -22,4 +26,13 @@ func ParseDomain(email string) string {
 	} else {
 		return ""
 	}
+}
+
+// ParseHeader parses the Authorization header from the request.
+func ParseHeader(r *http.Request) ([]byte, error) {
+	token := strings.TrimSpace(r.Header.Get("Authorization"))
+	if token == "" {
+		return nil, fmt.Errorf(`empty query (Authorization)`)
+	}
+	return []byte(strings.TrimSpace(strings.TrimPrefix(token, "Bearer"))), nil
 }
