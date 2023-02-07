@@ -1,8 +1,10 @@
 export const Auth = {
     /** I should be able to return the response body of the request in a type-safe way */
-    verify: (token: string | null = "") => send("get", "/auth/v0/login", undefined, { Authorization: `Bearer ${token}` }),
+    loginVerify: (token: string | null = "") => send("get", "/auth/v0/login", undefined, { Authorization: `Bearer ${token}` }),
     /** I should be able to return the response body of the request in a type-safe way */
     login: (email: string) => send("post", "/auth/v0/login", { email }),
+    signup: (email: string, username: string) => send("post", "/registry/v0/signup", { email, username }),
+    signupVerify: (token: string | null = "") => send("get", "/auth/v0/login", undefined, { Authorization: `Bearer ${token}` }),
 };
 
 /** 
