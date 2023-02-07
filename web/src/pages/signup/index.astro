@@ -13,57 +13,42 @@
         <form id="signup">
             <label for="email">
                 <span>Email</span>
-                <input type="email" name="email" id="email" />
-            </label>
-            <label for="username">
-                <span>Username</span>
-                <input type="text" name="username" id="username" />
+                <input type="email" name="email" id="email" required />
             </label>
             <button type="submit">Sign up</button>
         </form>
 
         <a href="/login">Already registered?</a>
-
-        <!-- <a href="/" aria-disabled="true"></a> -->
     </body>
 </html>
 
 <script>
     import { Auth } from "../../lib/agent";
 
-    document
-        .querySelector<HTMLFormElement>("#signup")
-        ?.addEventListener("submit", async function (event) {
-            event.preventDefault();
+    const form = document.querySelector<HTMLFormElement>("#signup");
 
-            const email = (new FormData(this).get("email") || "").toString();
-            const username = (
-                new FormData(this).get("username") || ""
-            ).toString();
+    form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
 
-            const response = await Auth.signup(email, username);
+        const email = new FormData(form).get("email") as string;
 
-            switch (response.status) {
-                case 202:
-                    const { provider } = await response.json();
-                    if (provider) {
-                        // append a link to the page if provider is not null
-                        const link = document.createElement("a");
-                        link.href = provider;
-                        link.textContent = `Check your email to complete the signup process`;
-                        document.body.appendChild(link);
-                    } else {
-                        const p = document.createElement("p");
-                        p.textContent = `Check your email to complete the signup process`;
-                        document.body.appendChild(p);
-                    }
-                    break;
-                case 400:
-                    alert("Invalid email or username");
-                    break;
-                default:
-                    alert("Unknown error");
-                    break;
-            }
-        });
+        const data = await Auth.signup(email);
+
+        if (!data) {
+            alert("Invalid email");
+            return;
+        }
+
+        if (data.provider) {
+            // append a link to the page if provider is not null
+            const link = document.createElement("a");
+            link.href = data.provider;
+            link.textContent = `Check your email to complete the signup process`;
+            document.body.appendChild(link);
+        } else {
+            const p = document.createElement("p");
+            p.textContent = `Check your email to complete the signup process`;
+            document.body.appendChild(p);
+        }
+    });
 </script>

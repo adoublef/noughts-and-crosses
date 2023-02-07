@@ -25,30 +25,30 @@
 <script>
     import { Auth } from "../../lib/agent";
 
-    document
-        .querySelector<HTMLFormElement>("#login")
-        ?.addEventListener("submit", async function (event) {
-            event.preventDefault();
+    const form = document.querySelector<HTMLFormElement>("#login");
 
-            const email = (new FormData(this).get("email") || "").toString();
+    form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
 
-            const response = await Auth.login(email);
+        const email = new FormData(form).get("email") as string;
 
-            if (response.ok) {
-                const { provider } = await response.json();
-                if (provider) {
-                    // append a link to the page if provider is not null
-                    const link = document.createElement("a");
-                    link.href = provider;
-                    link.textContent = `Check your email to complete the signup process`;
-                    document.body.appendChild(link);
-                } else {
-                    const p = document.createElement("p");
-                    p.textContent = `Check your email to complete the signup process`;
-                    document.body.appendChild(p);
-                }
-            } else {
-                alert("Invalid email");
-            }
-        });
+        const data = await Auth.login(email);
+        // console.log(response.status, response.ok);
+        if (!data) {
+            alert("Error occured");
+            return;
+        }
+
+        if (data.provider) {
+            // append a link to the page if provider is not null
+            const link = document.createElement("a");
+            link.href = data.provider;
+            link.textContent = `Check your email to complete the login process`;
+            document.body.appendChild(link);
+        } else {
+            const p = document.createElement("p");
+            p.textContent = `Check your email to complete the login process`;
+            document.body.appendChild(p);
+        }
+    });
 </script>

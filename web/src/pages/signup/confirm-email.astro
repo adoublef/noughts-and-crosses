@@ -1,9 +1,9 @@
 ---
 import { Auth } from "../../lib/agent";
 
-// either 200 or 401
-const response = await Auth.signupVerify(Astro.url.searchParams.get("token"));
-let authorized = response.ok;
+const token = Astro.url.searchParams.get("token");
+
+const data = await Auth.signupVerify(token);
 ---
 
 <html lang="en">
@@ -16,6 +16,76 @@ let authorized = response.ok;
     </head>
     <body>
         <h1>Astro</h1>
-        {authorized ? <p>Authorized</p> : <p>Not authorized</p>}
+        {
+            data ? (
+                <>
+                    <p>Authorized, complete signup</p>
+                    <form id="profile" data-token={token}>
+                        <label for="email">
+                            <span>Email</span>
+                            <input
+                                type="email"
+                                name="email"
+                                id="email"
+                                value={data.email}
+                                readonly
+                            />
+                        </label>
+                        <label for="username">
+                            <span>Username</span>
+                            <input
+                                type="text"
+                                name="username"
+                                id="username"
+                                required
+                            />
+                        </label>
+                        <label for="bio">
+                            <span>Bio</span>
+                            <textarea name="bio" id="bio" />
+                        </label>
+                        <button type="submit">Sign up</button>
+                    </form>
+                </>
+            ) : (
+                <>
+                    <p>Not authorized</p>
+                    <p>An error occured, please try again or contact support</p>
+                </>
+            )
+        }
     </body>
 </html>
+
+<script>
+    import { User } from "../../lib/agent";
+
+    const form = document.querySelector<HTMLFormElement>("#profile");
+
+    form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const token = form.dataset.token!; //note should validate that the form email is the same as this token, on the backend
+        // const email = form.dataset.email!;
+        const email = new FormData(form).get("email") as string; // NOTE may be vuneral still
+        const username = new FormData(form).get("username") as string;
+        const bio = new FormData(form).get("bio") as string;
+        // TODO: upload profile image
+
+        // alert(JSON.stringify({ token, email, username, bio }));
+
+        const response = await User.create(token, email, username, bio); //NOTE replace with this line
+
+        // created profile is 201 but this is failing
+        switch (response.status) {
+            case 201:
+                alert("Successfully created profile");
+                break;
+            default:
+                alert("Unknown error");
+                break;
+        }
+
+        alert(JSON.stringify({ token, email, username, bio }));
+    });
+</script>
