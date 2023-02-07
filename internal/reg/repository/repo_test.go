@@ -23,12 +23,12 @@ func init() {
 	ctx := context.TODO()
 
 	m := `
-	CREATE SCHEMA reg;
-
+	CREATE SCHEMA IF NOT EXISTS registry;
+	
 	CREATE EXTENSION IF NOT EXISTS pgcrypto;
 	CREATE EXTENSION IF NOT EXISTS citext;
 
-	CREATE TABLE IF NOT EXISTS reg.user (
+	CREATE TABLE IF NOT EXISTS registry.profiles (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		email CITEXT UNIQUE NOT NULL CHECK (email ~ '^[a-zA-Z0-9.!#$%&’*+/=?^_` + "`" + `{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?)*$'),
 		username VARCHAR(15) UNIQUE NOT NULL CHECK (username <> ''),

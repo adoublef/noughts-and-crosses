@@ -21,33 +21,58 @@ type User struct {
 
 type Repo interface {
 	SetProfile(ctx context.Context, args pgx.QueryRewriter) error
-	GetProfile(ctx context.Context, args pgx.QueryRewriter) (*reg.User, error)
+	GetProfile(ctx context.Context, args pgx.QueryRewriter) (*reg.Profile, error)
 	UnsetProfile(ctx context.Context, args pgx.QueryRewriter) error
 	UpdateProfile(ctx context.Context, args pgx.QueryRewriter) error
 	SetPhotoURL(ctx context.Context, args pgx.QueryRewriter) error
 }
 
-var _ Repo = (*repo)(nil)
-
 type repo struct {
-	c pg.Conn[reg.User]
+	c pg.Conn[reg.Profile]
+}
+
+type UUIDArgs struct {
+	ID uuid.UUID
+}
+
+func (a UUIDArgs) RewriteQuery(ctx context.Context, conn *pgx.Conn, sql string, args []any) (newSQL string, newArgs []any, err error) {
+	na := pgx.NamedArgs{
+		"id": a.ID,
+	}
+
+	return na.RewriteQuery(ctx, conn, sql, args)
 }
 
 // GetProfile implements Repo
-func (r *repo) GetProfile(ctx context.Context, args pgx.QueryRewriter) (*reg.User, error) {
+func (r *repo) GetProfile(ctx context.Context, args pgx.QueryRewriter) (*reg.Profile, error) {
 	const q = `
 	SELECT id, email, username
-	FROM reg.user
+	FROM registry.profiles
 	WHERE id = @id`
 
-	return r.c.QueryRowContext(ctx, func(r pgx.Row, u *reg.User) error {
+	return r.c.QueryRowContext(ctx, func(r pgx.Row, u *reg.Profile) error {
 		return r.Scan(&u.ID, &u.Email, &u.Username)
 	}, q, args)
 }
 
+type SetProfileArgs struct {
+	Email    string
+	Username string
+}
+
+func (a SetProfileArgs) RewriteQuery(ctx context.Context, conn *pgx.Conn, sql string, args []any) (newSQL string, newArgs []any, err error) {
+	na := pgx.NamedArgs{
+		"id":       uuid.New(),
+		"email":    a.Email,
+		"username": a.Username,
+	}
+
+	return na.RewriteQuery(ctx, conn, sql, args)
+}
+
 func (r *repo) SetProfile(ctx context.Context, args pgx.QueryRewriter) error {
 	const q = `
-	INSERT INTO reg.user (id, email, username)
+	INSERT INTO registry.profiles (id, email, username)
 	VALUES (@id, @email, @username)`
 
 	_, err := r.c.ExecContext(ctx, q, args)
@@ -56,7 +81,7 @@ func (r *repo) SetProfile(ctx context.Context, args pgx.QueryRewriter) error {
 
 func (r *repo) UnsetProfile(ctx context.Context, args pgx.QueryRewriter) error {
 	const q = `
-	DELETE FROM reg.user
+	DELETE FROM registry.profiles
 	WHERE id = @id`
 
 	count, err := r.c.ExecContext(ctx, q, args)
@@ -69,7 +94,7 @@ func (r *repo) UnsetProfile(ctx context.Context, args pgx.QueryRewriter) error {
 
 func (r *repo) SetBio(ctx context.Context, args pgx.QueryRewriter) error {
 	const q = `
-	UPDATE reg.user
+	UPDATE registry.profiles
 	SET bio = NULLIF(@bio,'')
 	WHERE id = @id`
 
@@ -81,9 +106,23 @@ func (r *repo) SetBio(ctx context.Context, args pgx.QueryRewriter) error {
 	return err
 }
 
+type SetPhotoURLArgs struct {
+	ID       uuid.UUID
+	PhotoURL string
+}
+
+func (a SetPhotoURLArgs) RewriteQuery(ctx context.Context, conn *pgx.Conn, sql string, args []any) (newSQL string, newArgs []any, err error) {
+	na := pgx.NamedArgs{
+		"id":        a.ID,
+		"photo_url": a.PhotoURL,
+	}
+
+	return na.RewriteQuery(ctx, conn, sql, args)
+}
+
 func (r *repo) SetPhotoURL(ctx context.Context, args pgx.QueryRewriter) error {
 	const q = `
-	UPDATE reg.user
+	UPDATE registry.profiles
 	SET photo_url = NULLIF(@photo_url,'')
 	WHERE id = @id`
 
@@ -95,9 +134,25 @@ func (r *repo) SetPhotoURL(ctx context.Context, args pgx.QueryRewriter) error {
 	return err
 }
 
+type UpdateProfileArgs struct {
+	ID       uuid.UUID
+	Username string
+	Bio      string
+}
+
+func (a UpdateProfileArgs) RewriteQuery(ctx context.Context, conn *pgx.Conn, sql string, args []any) (newSQL string, newArgs []any, err error) {
+	na := pgx.NamedArgs{
+		"id":       a.ID,
+		"username": a.Username,
+		"bio":      a.Bio,
+	}
+
+	return na.RewriteQuery(ctx, conn, sql, args)
+}
+
 func (r *repo) UpdateProfile(ctx context.Context, args pgx.QueryRewriter) error {
 	const q = `
-	UPDATE reg.user
+	UPDATE registry.profiles
 	SET username = @username,
 		bio = NULLIF(@bio,''),
 		WHERE id = @id`
@@ -111,6 +166,6 @@ func (r *repo) UpdateProfile(ctx context.Context, args pgx.QueryRewriter) error 
 }
 
 func New(rwc *pgxpool.Pool) Repo {
-	r := &repo{c: pg.NewConn[reg.User](rwc)}
+	r := &repo{c: pg.NewConn[reg.Profile](rwc)}
 	return r
 }
