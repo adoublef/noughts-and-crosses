@@ -17,25 +17,13 @@ import (
 	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
 )
 
-//go:embed templates/confirmation_login.html
-var confirmLogin embed.FS
-
-//go:embed templates/confirmation_signup.html
-var confirmSignUp embed.FS
-
 var (
-// _, b, _, _ = runtime.Caller(0)
-// basepath   = filepath.Dir(b)
+	//go:embed templates/confirmation_login.html
+	confirmLogin embed.FS
+
+	//go:embed templates/confirmation_signup.html
+	confirmSignUp embed.FS
 )
-
-// func init() {
-// 	// _ = tpl
-
-// 	// tpl2 := template.Must(template.ParseFS(confirmationEmail, "templates/confirmation.html"))
-// 	// _ = tpl2
-// }
-
-var _ http.Handler = (*Service)(nil)
 
 type Service struct {
 	mux  chi.Router
@@ -63,11 +51,11 @@ func (s *Service) routes() {
 }
 
 func (s *Service) listen() {
-	s.e.Subscribe(events.EventUserLogin, s.handleLoginConfirmation())
-	s.e.Subscribe(events.EventUserSignup, s.handleSignupConfirmation())
+	s.e.Subscribe(events.EventSendLoginConfirm, s.handleLoginConfirm())
+	s.e.Subscribe(events.EventSendSignupConfirm, s.handleSignupConfirm())
 }
 
-func (s *Service) handleSignupConfirmation() nats.MsgHandler {
+func (s *Service) handleSignupConfirm() nats.MsgHandler {
 	type renderArgs struct {
 		Href string
 	}
@@ -77,16 +65,15 @@ func (s *Service) handleSignupConfirmation() nats.MsgHandler {
 		log.Fatal(err)
 	}
 
+	// NOTE this could be eventually cleaned up
 	newToken := func(data []byte) ([]byte, error) {
-		raw, err := s.e.Conn().RequestMsg(&nats.Msg{Subject: events.EventTokenGenerateSignUp, Data: data}, 5*time.Second)
+		raw, err := s.e.Request(&nats.Msg{Subject: events.EventGenerateSignupToken, Data: data}, 5*time.Second)
 		if err != nil {
 			return nil, err
 		}
 
-		var tokGen struct {
-			Token []byte
-		}
-		if err := events.Decode(raw.Data, &tokGen); err != nil {
+		var tokGen events.DataEmailToken
+		if err := events.Decode(raw, &tokGen); err != nil {
 			return nil, err
 		}
 
@@ -111,14 +98,13 @@ func (s *Service) handleSignupConfirmation() nats.MsgHandler {
 	}
 
 	return func(msg *nats.Msg) {
-		var userIn struct {
-			Email    string
-			Username string
-		}
+		var userIn events.DataSignUpConfirm
 		if err := events.Decode(msg.Data, &userIn); err != nil {
 			log.Println(err)
 			return
 		}
+
+		log.Println(userIn.Email)
 
 		tk, err := newToken(msg.Data)
 		if err != nil {
@@ -135,7 +121,7 @@ func (s *Service) handleSignupConfirmation() nats.MsgHandler {
 	}
 }
 
-func (s *Service) handleLoginConfirmation() nats.MsgHandler {
+func (s *Service) handleLoginConfirm() nats.MsgHandler {
 	type renderArgs struct {
 		Href string
 	}
@@ -163,10 +149,7 @@ func (s *Service) handleLoginConfirmation() nats.MsgHandler {
 	}
 
 	return func(msg *nats.Msg) {
-		var userIn struct {
-			Email string
-			Token []byte
-		}
+		var userIn events.DataLoginConfirm
 		if err := events.Decode(msg.Data, &userIn); err != nil {
 			log.Println(err)
 			return

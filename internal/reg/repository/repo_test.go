@@ -62,6 +62,7 @@ func TestUserRepository(t *testing.T) {
 			"id":       johnDoe,
 			"email":    "john@doe.com",
 			"username": "john123doe",
+			// "bio":      "",
 		}
 
 		err := regRepo.SetProfile(ctx, args)

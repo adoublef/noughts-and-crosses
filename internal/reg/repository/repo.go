@@ -58,6 +58,7 @@ func (r *repo) GetProfile(ctx context.Context, args pgx.QueryRewriter) (*reg.Pro
 type SetProfileArgs struct {
 	Email    string
 	Username string
+	Bio      string
 }
 
 func (a SetProfileArgs) RewriteQuery(ctx context.Context, conn *pgx.Conn, sql string, args []any) (newSQL string, newArgs []any, err error) {
@@ -65,6 +66,7 @@ func (a SetProfileArgs) RewriteQuery(ctx context.Context, conn *pgx.Conn, sql st
 		"id":       uuid.New(),
 		"email":    a.Email,
 		"username": a.Username,
+		"bio":      a.Bio,
 	}
 
 	return na.RewriteQuery(ctx, conn, sql, args)
@@ -72,8 +74,8 @@ func (a SetProfileArgs) RewriteQuery(ctx context.Context, conn *pgx.Conn, sql st
 
 func (r *repo) SetProfile(ctx context.Context, args pgx.QueryRewriter) error {
 	const q = `
-	INSERT INTO registry.profiles (id, email, username)
-	VALUES (@id, @email, @username)`
+	INSERT INTO registry.profiles (id, email, username, bio)
+	VALUES (@id, @email, @username, NULLIF(@bio,''))`
 
 	_, err := r.c.ExecContext(ctx, q, args)
 	return err

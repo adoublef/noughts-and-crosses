@@ -15,8 +15,6 @@ import (
 	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
 )
 
-var _ http.Handler = (*Service)(nil)
-
 type Service struct {
 	m  service.Router
 	e  events.Broker
@@ -53,24 +51,6 @@ func (s *Service) handleLogin() http.HandlerFunc {
 		Email string `json:"email"`
 	}
 
-	newLoginTokenMsg := func(email string) (*nats.Msg, error) {
-		tk, err := s.tk.GenerateToken(context.Background(), jot.WithEnd(5*time.Minute), jot.WithPrivateClaims(jot.PrivateClaims{"email": email}))
-		if err != nil {
-			return nil, err
-		}
-
-		data := struct {
-			Email string
-			Token []byte
-		}{Email: email, Token: tk}
-		p, err := events.Encode(data)
-		if err != nil {
-			return nil, err
-		}
-
-		return &nats.Msg{Subject: events.EventUserLogin, Data: p}, nil
-	}
-
 	type response struct {
 		Provider string `json:"provider"`
 	}
@@ -81,13 +61,19 @@ func (s *Service) handleLogin() http.HandlerFunc {
 			return
 		}
 
-		msg, err := newLoginTokenMsg(q.Email)
+		tk, err := s.tk.GenerateToken(context.Background(), jot.WithEnd(5*time.Minute), jot.WithPrivateClaims(jot.PrivateClaims{"email": q.Email}))
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
-		if err := s.e.Conn().PublishMsg(msg); err != nil {
+		msg, err := events.EncodeLoginConfirmMsg(q.Email, tk)
+		if err != nil {
+			s.m.Respond(w, r, err, http.StatusInternalServerError)
+			return
+		}
+
+		if err := s.e.Publish(msg); err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
@@ -99,6 +85,9 @@ func (s *Service) handleLogin() http.HandlerFunc {
 }
 
 func (s *Service) handleConfirmLogin() http.HandlerFunc {
+	// type response struct{
+	// 	OK bool `json:"ok"`
+	// }
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, err := s.tk.ParseRequest(r)
 		if err != nil {
@@ -140,7 +129,7 @@ func (s *Service) handleConfirmLogin() http.HandlerFunc {
 		// }
 		// create a session (using JWT)
 
-		s.m.Respond(w, r, nil, http.StatusOK)
+		s.m.Respond(w, r, true, http.StatusOK)
 	}
 }
 
@@ -157,21 +146,59 @@ func (s *Service) handleRefreshToken() http.HandlerFunc {
 }
 
 func (s *Service) listen() {
-	s.e.Subscribe(events.EventTokenGenerateSignUp, s.handleConfirmSignUp())
+	s.e.Subscribe(events.EventGenerateSignupToken, s.handleGenerateSignUpToken())
+	s.e.Subscribe(events.EventVerifySignupToken, s.handleVerifySignUpToken())
 }
 
-func (s *Service) handleConfirmSignUp() nats.MsgHandler {
-	// NOTE
-	newReplyMsg := func(subj string, email, username string) (*nats.Msg, error) {
-		encTk, err := s.tk.GenerateToken(context.Background(), jot.WithEnd(5*time.Minute), jot.WithPrivateClaims(jot.PrivateClaims{"email": email, "username": username}))
+func (s *Service) handleVerifySignUpToken() nats.MsgHandler {
+	type A struct {
+		Email string
+	}
+
+	return func(msg *nats.Msg) {
+		var tokVal events.DataEmailToken
+		if err := events.Decode(msg.Data, &tokVal); err != nil {
+			log.Println(err)
+			return
+		}
+
+		tk, err := s.tk.ParseToken(tokVal.Token)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		email, _ := tk.PrivateClaims()["email"].(string)
+		{
+			raw := A{
+				Email: email,
+			}
+			p, err := events.Encode(raw)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			if err := msg.Respond(p); err != nil {
+				log.Println(err)
+				return
+			}
+		}
+
+		log.Println("email", email)
+	}
+}
+
+func (s *Service) handleGenerateSignUpToken() nats.MsgHandler {
+	// NOTE move to events package when I can thing of a decent abstraction
+	newReplyMsg := func(subj string, email string) (*nats.Msg, error) {
+		encTk, err := s.tk.GenerateToken(context.Background(), jot.WithEnd(5*time.Minute), jot.WithPrivateClaims(jot.PrivateClaims{"email": email}))
 		if err != nil {
 			return nil, err
 		}
 
 		// reply
-		tokenGen := struct {
-			Token []byte
-		}{Token: encTk}
+		tokenGen := events.DataEmailToken{Token: encTk}
 		p, err := events.Encode(tokenGen)
 		if err != nil {
 			return nil, err
@@ -181,23 +208,19 @@ func (s *Service) handleConfirmSignUp() nats.MsgHandler {
 	}
 
 	return func(msg *nats.Msg) {
-		var tokenBd struct {
-			Email    string
-			Username string
-		}
-
+		var tokenBd events.DataSignUpConfirm
 		if err := events.Decode(msg.Data, &tokenBd); err != nil {
 			log.Println(err)
 			return
 		}
 
-		msg, err := newReplyMsg(msg.Reply, tokenBd.Email, tokenBd.Username)
+		msg, err := newReplyMsg(msg.Reply, tokenBd.Email)
 		if err != nil {
 			log.Println(err)
 			return
 		}
 
-		if err := s.e.Conn().PublishMsg(msg); err != nil {
+		if err := s.e.Publish(msg); err != nil {
 			log.Println(err)
 			return
 		}

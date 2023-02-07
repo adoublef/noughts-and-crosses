@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -13,7 +12,6 @@ import (
 	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
 	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
-	"github.com/nats-io/nats.go"
 )
 
 var _ http.Handler = (*Service)(nil)
@@ -55,85 +53,54 @@ func (s *Service) routes() {
 }
 
 func (s *Service) handleConfirmSignUp() http.HandlerFunc {
-	parseHeader := func(r *http.Request) (string, error) {
-		token := strings.TrimSpace(r.URL.Query().Get("token"))
-		if token == "" {
-			return "", fmt.Errorf(`empty query (Authorization)`)
-		}
-		return strings.TrimSpace(strings.TrimPrefix(token, "Bearer")), nil
-	}
-
-	newSignupTokenMsg := func(token string) (*nats.Msg, error) {
-		v := struct {
-			Token string
-		}{Token: token}
-		p, err := events.Encode(v)
-		if err != nil {
-			return nil, err
-		}
-		// Request from Auth service to get token from header.
-		msg := nats.Msg{
-			Subject: events.EventUserSignup,
-			// token from header
-			Data: p,
-		}
-		return &msg, nil
+	type response struct {
+		Email string `json:"email"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		token, err := parseHeader(r)
+		fmt.Println(r.URL.String())
+
+		token, err := parse.ParseHeader(r)
 		if err != nil {
-			s.m.Respond(w, r, err, http.StatusBadRequest)
+			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
 		}
 
-		msg, err := newSignupTokenMsg(token)
-		if err != nil {
-			s.m.Respond(w, r, err, http.StatusInternalServerError)
-			return
+		p := response{}
+		{
+			msg, err := events.EncodeSignupVerifyMsg(token)
+			if err != nil {
+				s.m.Respond(w, r, err, http.StatusInternalServerError)
+				return
+			}
+
+			// get the email from token, parsed from auth
+			out, err := s.e.Request(msg, 5*time.Second)
+			if err != nil {
+				s.m.Respond(w, r, err, http.StatusInternalServerError)
+				return
+			}
+
+			var raw struct {
+				Email string
+			}
+
+			if err := events.Decode(out, &raw); err != nil {
+				s.m.Respond(w, r, err, http.StatusInternalServerError)
+				return
+			}
+
+			p.Email = raw.Email
 		}
 
-		raw, err := s.e.Conn().RequestMsg(msg, 5*time.Second)
-		if err != nil {
-			s.m.Respond(w, r, err, http.StatusBadRequest)
-			return
-		}
-
-		_ = raw
-
-		// Decode token from raw out.
-		// var out struct {
-		// }
-		// if err := events.Decode(raw.Data, &out); err != nil {
-		// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
-		// 	return
-		// }
-
-		s.m.Respond(w, r, nil, http.StatusOK)
+		fmt.Println(p)
+		s.m.Respond(w, r, p, http.StatusOK)
 	}
 }
 
 func (s *Service) handleSignUp() http.HandlerFunc {
 	type request struct {
-		Email    string `json:"email"`
-		Username string `json:"username"`
-	}
-
-	newSignUpMsg := func(email, username string) (*nats.Msg, error) {
-		// send email to complete sign-up process
-		// automatically check which email provider so
-		// can send a link to the correct email provider
-		// https://www.freecodecamp.org/news/the-best-free-email-providers-2021-guide-to-online-email-account-services/
-		data := struct {
-			Email    string
-			Username string
-		}{Email: email, Username: username}
-		p, err := events.Encode(data)
-		if err != nil {
-			return nil, err
-		}
-
-		return &nats.Msg{Subject: events.EventUserSignup, Data: p}, nil
+		Email string `json:"email"`
 	}
 
 	type response struct {
@@ -146,13 +113,13 @@ func (s *Service) handleSignUp() http.HandlerFunc {
 			return
 		}
 
-		msg, err := newSignUpMsg(q.Email, q.Username)
+		msg, err := events.EncodeSendSignupConfirmMsg(q.Email)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
-		if err := s.e.Conn().PublishMsg(msg); err != nil {
+		if err := s.e.Publish(msg); err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
@@ -160,6 +127,69 @@ func (s *Service) handleSignUp() http.HandlerFunc {
 		s.m.Respond(w, r, response{
 			Provider: parse.ParseDomain(q.Email),
 		}, http.StatusAccepted)
+	}
+}
+
+func (s *Service) handleRegisterProfile() http.HandlerFunc {
+	type request struct {
+		Email    string `json:"email"`
+		Username string `json:"username"`
+		Bio      string `json:"bio"`
+	}
+
+	type response struct {
+		Message string `json:"message"`
+	}
+
+	// should appear when sign-up confirm email returns authorized
+	// the token has the email & username so that should be sent
+	// here along with user bio (optional) and user image (also optional)
+	// then on confirm, it will create the user profile
+	// and redirect to dashboard.
+	// Application already verified the email so no need to auth again.
+	// NOTE: this means signup confirm only needs email address
+	// add username can be provided at this endpoint. decluttering the API a bit
+	return func(w http.ResponseWriter, r *http.Request) {
+		// use the same token as signup confirm, this should be protected
+		{
+			// token, err := parse.ParseHeader(r)
+			// if err != nil {
+			// 	s.m.Respond(w, r, err, http.StatusBadRequest)
+			// 	return
+			// }
+
+			// msg, err := events.EncodeSignupTokenMsg(token)
+			// if err != nil {
+			// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
+			// 	return
+			// }
+
+			// _, err = s.e.Request(msg, 5*time.Second)
+			// if err != nil {
+			// 	s.m.Respond(w, r, err, http.StatusBadRequest)
+			// 	return
+			// }
+		}
+		var q request
+		if err := s.m.Decode(w, r, &q); err != nil {
+			s.m.Respond(w, r, err, http.StatusBadRequest)
+			return
+		}
+
+		args := repo.SetProfileArgs{
+			Email:    q.Email,
+			Username: q.Username,
+			Bio:      q.Bio,
+		}
+
+		if err := s.r.SetProfile(r.Context(), args); err != nil {
+			s.m.Respond(w, r, err, http.StatusInternalServerError)
+			return
+		}
+
+		// TODO: send email to user with verification link
+		// TODO: Update Location header
+		s.m.Respond(w, r, true, http.StatusCreated)
 	}
 }
 
@@ -253,47 +283,6 @@ func (s *Service) handleSetProfile() http.HandlerFunc {
 
 		// profile created. add location header
 		s.m.Respond(w, r, nil, http.StatusOK)
-	}
-}
-
-func (s *Service) handleRegisterProfile() http.HandlerFunc {
-	type Q struct {
-		Email    string `json:"email"`
-		Username string `json:"username"`
-	}
-
-	type P struct {
-		Message string `json:"message"`
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		var q Q
-		if err := s.m.Decode(w, r, &q); err != nil {
-			s.m.Respond(w, r, err, http.StatusBadRequest)
-			return
-		}
-
-		args := repo.SetProfileArgs{
-			Email:    q.Email,
-			Username: q.Username,
-		}
-
-		if err := s.r.SetProfile(r.Context(), args); err != nil {
-			s.m.Respond(w, r, err, http.StatusInternalServerError)
-			return
-		}
-
-		// NOTE send confirmation email with verification link
-		// if err := s.e.Publish(events.EventUserRegister, q); err != nil {
-		// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
-		// 	return
-		// }
-
-		p := &P{
-			Message: "Check emails to continue registration process",
-		}
-
-		s.m.Respond(w, r, p, http.StatusCreated)
 	}
 }
 
