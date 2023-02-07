@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -12,6 +11,8 @@ import (
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
 	jot "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
+
+	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
 )
 
 var _ http.Handler = (*Service)(nil)
@@ -52,10 +53,6 @@ func (s *Service) handleLogin() http.HandlerFunc {
 		Email string `json:"email"`
 	}
 
-	type response struct {
-		Message string `json:"message"`
-	}
-
 	newLoginTokenMsg := func(email string) (*nats.Msg, error) {
 		tk, err := s.tk.GenerateToken(context.Background(), jot.WithEnd(5*time.Minute), jot.WithPrivateClaims(jot.PrivateClaims{"email": email}))
 		if err != nil {
@@ -74,6 +71,9 @@ func (s *Service) handleLogin() http.HandlerFunc {
 		return &nats.Msg{Subject: events.EventUserLogin, Data: p}, nil
 	}
 
+	type response struct {
+		Provider string `json:"provider"`
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		var q request
 		if err := s.m.Decode(w, r, &q); err != nil {
@@ -93,54 +93,51 @@ func (s *Service) handleLogin() http.HandlerFunc {
 		}
 
 		s.m.Respond(w, r, response{
-			Message: "check emails for confirmation",
+			Provider: parse.ParseDomain(q.Email),
 		}, http.StatusOK)
 	}
 }
 
 func (s *Service) handleConfirmLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tk, err := s.tk.ParseRequest(r)
+		_, err := s.tk.ParseRequest(r)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
 		}
 
 		// ask registry service if user exists
-		{
-			fmt.Println(tk.PrivateClaims()["email"].(string))
 
-			// email, _ := tk.PrivateClaims()["email"].(string)
+		// email, _ := tk.PrivateClaims()["email"].(string)
 
-			// var (
-			// 	in  *nats.Msg
-			// 	out *nats.Msg
-			// 	err error
-			// )
+		// var (
+		// 	in  *nats.Msg
+		// 	out *nats.Msg
+		// 	err error
+		// )
 
-			// in = &nats.Msg{Subject: "profile.exists", Data: []byte(email)}
-			// out, err = s.e.Conn().RequestMsg(in, 5*time.Second)
-			// if err != nil {
-			// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
-			// 	return
-			// }
+		// in = &nats.Msg{Subject: "profile.exists", Data: []byte(email)}
+		// out, err = s.e.Conn().RequestMsg(in, 5*time.Second)
+		// if err != nil {
+		// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
+		// 	return
+		// }
 
-			// // pointer to struct
-			// var p *struct {
-			// 	ID uuid.UUID
-			// 	// use a defined type
-			// 	Email string
-			// 	// use a defined type
-			// 	Username string
-			// 	// use a defined type
-			// 	PhotoURL string
-			// }
+		// // pointer to struct
+		// var p *struct {
+		// 	ID uuid.UUID
+		// 	// use a defined type
+		// 	Email string
+		// 	// use a defined type
+		// 	Username string
+		// 	// use a defined type
+		// 	PhotoURL string
+		// }
 
-			// if err := events.Decode(out.Data, p); err != nil {
-			// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
-			// 	return
-			// }
-		}
+		// if err := events.Decode(out.Data, p); err != nil {
+		// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
+		// 	return
+		// }
 		// create a session (using JWT)
 
 		s.m.Respond(w, r, nil, http.StatusOK)

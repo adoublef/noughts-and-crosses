@@ -12,6 +12,7 @@ import (
 	"github.com/hyphengolang/noughts-and-crosses/internal/reg"
 	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
+	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
 	"github.com/nats-io/nats.go"
 )
 
@@ -113,13 +114,9 @@ func (s *Service) handleConfirmSignUp() http.HandlerFunc {
 }
 
 func (s *Service) handleSignUp() http.HandlerFunc {
-	type Q struct {
+	type request struct {
 		Email    string `json:"email"`
 		Username string `json:"username"`
-	}
-
-	type P struct {
-		Message string `json:"message"`
 	}
 
 	newSignUpMsg := func(email, username string) (*nats.Msg, error) {
@@ -139,8 +136,11 @@ func (s *Service) handleSignUp() http.HandlerFunc {
 		return &nats.Msg{Subject: events.EventUserSignup, Data: p}, nil
 	}
 
+	type response struct {
+		Provider string `json:"provider"`
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		var q Q
+		var q request
 		if err := s.m.Decode(w, r, &q); err != nil {
 			s.m.Respond(w, r, err, http.StatusBadRequest)
 			return
@@ -157,7 +157,9 @@ func (s *Service) handleSignUp() http.HandlerFunc {
 			return
 		}
 
-		s.m.Respond(w, r, P{Message: "email sent"}, http.StatusAccepted)
+		s.m.Respond(w, r, response{
+			Provider: parse.ParseDomain(q.Email),
+		}, http.StatusAccepted)
 	}
 }
 
