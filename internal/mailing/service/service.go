@@ -47,11 +47,11 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-func New(smtp smtp.Mailer, nc *nats.Conn) *Service {
+func New(smtp smtp.Mailer, e events.Broker) *Service {
 	s := &Service{
 		mux:  chi.NewRouter(),
 		smtp: smtp,
-		e:    events.NewClient(nc),
+		e:    e,
 	}
 	go s.listen()
 	s.routes()
@@ -77,8 +77,8 @@ func (s *Service) handleSignupConfirmation() nats.MsgHandler {
 		log.Fatal(err)
 	}
 
-	newToken := func(msg *nats.Msg) ([]byte, error) {
-		raw, err := s.e.Conn().RequestMsg(&nats.Msg{Subject: events.EventTokenGenerateSignUp, Data: msg.Data}, 5*time.Second)
+	newToken := func(data []byte) ([]byte, error) {
+		raw, err := s.e.Conn().RequestMsg(&nats.Msg{Subject: events.EventTokenGenerateSignUp, Data: data}, 5*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +120,7 @@ func (s *Service) handleSignupConfirmation() nats.MsgHandler {
 			return
 		}
 
-		tk, err := newToken(msg)
+		tk, err := newToken(msg.Data)
 		if err != nil {
 			log.Println(err)
 			return

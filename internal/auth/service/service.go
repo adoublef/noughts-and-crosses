@@ -26,10 +26,10 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.m.ServeHTTP(w, r)
 }
 
-func New(nc *nats.Conn, tk jot.TokenClient) *Service {
+func New(e events.Broker, tk jot.TokenClient) *Service {
 	s := &Service{
 		m:  service.NewRouter(),
-		e:  events.NewClient(nc),
+		e:  e,
 		tk: tk,
 	}
 	go s.listen()

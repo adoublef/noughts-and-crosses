@@ -28,10 +28,10 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // events.Client should be a dependency
-func New(nc *nats.Conn, r repo.Repo) *Service {
+func New(e events.Broker, r repo.Repo) *Service {
 	s := &Service{
 		m: service.NewRouter(),
-		e: events.NewClient(nc),
+		e: e,
 		r: r,
 	}
 	go s.listen()
