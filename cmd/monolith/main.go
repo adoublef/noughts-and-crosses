@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	auth "github.com/hyphengolang/noughts-and-crosses/internal/auth/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
+	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	mail "github.com/hyphengolang/noughts-and-crosses/internal/mailing/service"
 	rreg "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
 	sreg "github.com/hyphengolang/noughts-and-crosses/internal/reg/service"
@@ -61,24 +62,19 @@ func main() {
 	}
 }
 
-// example: POST http://localhost:8080/mailing/v0/send
 func newMailingService(nc *nats.Conn) *mail.Service {
-	// do not hard-code SMTP Port
-	e := smtp.NewMailer(conf.SMTPUsername, conf.SMTPPassword, conf.SMTPHost, 587)
-	srv := mail.New(e, nc)
-
-	return srv
+	em := smtp.NewMailer(conf.SMTPUsername, conf.SMTPPassword, conf.SMTPHost, 587)
+	ec := events.NewClient(nc)
+	return mail.New(em, ec)
 }
 
 func newRegService(nc *nats.Conn, pg *pgxpool.Pool) *sreg.Service {
-	srv := sreg.New(nc, rreg.New(pg))
-
-	return srv
+	ec := events.NewClient(nc)
+	return sreg.New(ec, rreg.New(pg))
 }
 
 func newAuthService(nc *nats.Conn) *auth.Service {
 	tk := jsonwebtoken.NewTokenClient()
-	srv := auth.New(nc, tk)
-
-	return srv
+	ec := events.NewClient(nc)
+	return auth.New(ec, tk)
 }
