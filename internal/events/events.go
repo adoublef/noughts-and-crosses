@@ -1,116 +1,69 @@
 package events
 
-import (
-	"bytes"
-	"encoding/gob"
-	"time"
-
-	"github.com/nats-io/nats.go"
-)
+import "github.com/nats-io/nats.go"
 
 type Event string
 
 const (
-	EventUserLogin           = "user.email.login"
-	EventUserSignup          = "user.email.signup"
-	EventUserRegister        = "user.registered"
-	EventTokenGenerateLogin  = "token.generate.login"
-	EventTokenGenerateSignUp = "token.generate.signup"
-	EventTokenVerify         = "token.verify"
+	EventLoginConfirmation   = "user.email.login"
+	EventSignupConfirmation  = "user.email.signup"
+	EventGenerateLoginToken  = "token.generate.login" // NOTE not used
+	EventGenerateSignUpToken = "token.generate.signup"
+	// EventTokenVerify         = "token.verify"
 )
 
-type Broker interface {
-	Conn() *nats.Conn
-	Encode(v any) ([]byte, error)
-	Decode(p []byte, v any) error
-	Publish(subject string, data any) error
-	Subscribe(subject string, cb nats.MsgHandler)
-	Request(subject string, data any, timeout time.Duration) ([]byte, error)
-	RequestAndResponse(subj string, response any, request any, timeout time.Duration) error
+// TODO implement Unmarshaler and Marshaler interfaces for binary encoding
+type DataSignUpConfirm struct {
+	Email    string
+	Username string
 }
 
-var _ Broker = (*pubsub)(nil)
-
-type pubsub struct {
-	nc *nats.Conn
+// TODO implement Unmarshaler and Marshaler interfaces for binary encoding
+type DataLoginConfirm struct {
+	Email string
+	Token []byte
 }
 
-// Conn implements Broker
-func (p *pubsub) Conn() *nats.Conn {
-	return p.nc
+// TODO implement Unmarshaler and Marshaler interfaces for binary encoding
+type DataTokenGen struct {
+	Token []byte
 }
 
-func NewClient(nc *nats.Conn) Broker {
-	return &pubsub{nc: nc}
-}
-
-func (ps *pubsub) Subscribe(subject string, cb nats.MsgHandler) {
-	_, err := ps.nc.Subscribe(subject, cb)
+func NewSignupTokenMsg(token []byte) (*nats.Msg, error) {
+	v := DataTokenGen{Token: token}
+	p, err := Encode(v)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
+	// Request from Auth service to get token from header.
+	msg := nats.Msg{
+		Subject: EventSignupConfirmation,
+		// token from header
+		Data: p,
+	}
+	return &msg, nil
 }
 
-func (ps *pubsub) Publish(subject string, data any) error {
-	p, err := ps.Encode(data)
-	if err != nil {
-		return err
-	}
-
-	return ps.nc.Publish(subject, p)
-}
-
-func (ps *pubsub) Request(subject string, data any, timeout time.Duration) ([]byte, error) {
-	p, err := ps.Encode(data)
+func NewSignupConfirmationMsg(email, username string) (*nats.Msg, error) {
+	// send email to complete sign-up process
+	// automatically check which email provider so
+	// can send a link to the correct email provider
+	// https://www.freecodecamp.org/news/the-best-free-email-providers-2021-guide-to-online-email-account-services/
+	data := DataSignUpConfirm{Email: email, Username: username}
+	p, err := Encode(data)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := ps.nc.Request(subject, p, 5*time.Second)
+	return &nats.Msg{Subject: EventSignupConfirmation, Data: p}, nil
+}
+
+func NewLoginConfirmationMsg(email string, token []byte) (*nats.Msg, error) {
+	data := DataLoginConfirm{Email: email, Token: token}
+	p, err := Encode(data)
 	if err != nil {
 		return nil, err
 	}
 
-	return msg.Data, nil
-}
-
-// TODO
-func (c *pubsub) RequestAndResponse(subj string, response, request any, timeout time.Duration) error {
-	q, err := Encode(request)
-	if err != nil {
-		return err
-	}
-
-	p, err := c.nc.Request(subj, q, timeout)
-	if err != nil {
-		return err
-	}
-
-	return Decode(p.Data, response)
-}
-
-func (*pubsub) Decode(p []byte, v any) error {
-	return gob.NewDecoder(bytes.NewReader(p)).Decode(v)
-}
-
-func (s *pubsub) Encode(v any) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(v); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-func Decode(p []byte, v any) error {
-	return gob.NewDecoder(bytes.NewReader(p)).Decode(v)
-}
-
-func Encode(v any) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(v); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
+	return &nats.Msg{Subject: EventLoginConfirmation, Data: p}, nil
 }
