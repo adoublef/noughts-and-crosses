@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,19 +10,34 @@ import (
 	auth "github.com/hyphengolang/noughts-and-crosses/internal/auth/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
 	mail "github.com/hyphengolang/noughts-and-crosses/internal/mailing/service"
-	reg "github.com/hyphengolang/noughts-and-crosses/internal/reg/service"
+	rreg "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
+	sreg "github.com/hyphengolang/noughts-and-crosses/internal/reg/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
 	jsonwebtoken "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/rs/cors"
 )
 
 func run() error {
+	ctx := context.Background()
+
 	nc, err := nats.Connect(conf.NATSURI, nats.UserJWTAndSeed(conf.NATSToken, conf.NATSSeed))
 	if err != nil {
 		return err
 	}
 	defer nc.Close()
+
+	conn, err := pgxpool.New(ctx, conf.DBURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	// ping the database
+	if err := conn.Ping(ctx); err != nil {
+		return err
+	}
 
 	mux := chi.NewRouter()
 	mux.Use(cors.Default().Handler)
@@ -29,13 +45,13 @@ func run() error {
 	msv := newMailingService(nc)
 	mux.Mount("/mail/v0", msv)
 
-	rsv := newRegService(nc)
-	mux.Mount("/reg/v0", rsv)
+	rsv := newRegService(nc, conn)
+	mux.Mount("/registry/v0", rsv)
 
 	asv := newAuthService(nc)
 	mux.Mount("/auth/v0", asv)
 
-	// return http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", conf.PORT), mux)
+	log.Println("Listening on port", conf.PORT)
 	return http.ListenAndServe(fmt.Sprintf(":%d", conf.PORT), mux)
 }
 
@@ -54,8 +70,8 @@ func newMailingService(nc *nats.Conn) *mail.Service {
 	return srv
 }
 
-func newRegService(nc *nats.Conn) *reg.Service {
-	srv := reg.New(nc)
+func newRegService(nc *nats.Conn, pg *pgxpool.Pool) *sreg.Service {
+	srv := sreg.New(nc, rreg.New(pg))
 
 	return srv
 }
