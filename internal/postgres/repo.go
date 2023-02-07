@@ -8,11 +8,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Conn[T any] interface {
-	Conn() *pgxpool.Pool
+type Reader interface {
 	ExecContext(ctx context.Context, query string, args pgx.QueryRewriter) (count int64, err error)
+}
+
+type Writer[T any] interface {
 	QueryRowContext(ctx context.Context, scanner func(row pgx.Row, t *T) error, query string, args pgx.QueryRewriter) (*T, error)
 	QueryContext(ctx context.Context, scanner func(row pgx.Rows, t *T) error, query string, args pgx.QueryRewriter) ([]*T, error)
+}
+
+type Conn[T any] interface {
+	Conn() *pgxpool.Pool
+
+	Reader
+	Writer[T]
 }
 
 type connHandler[T any] struct {
@@ -66,20 +75,6 @@ func QueryContext[T any](ctx context.Context, q *pgxpool.Pool, scanner func(r pg
 		vs = append(vs, &v)
 	}
 	return vs, rows.Err()
-}
-
-type ReadWriter[T any] interface {
-	Reader[T]
-	Writer[T]
-}
-
-type Reader[T any] interface {
-	Find(ctx context.Context, key any) (T, error)
-	FindMany(ctx context.Context) ([]T, error)
-}
-
-type Writer[T any] interface {
-	Create(ctx context.Context, t T) error
 }
 
 var ErrNoRowsAffected = errors.New("no rows affected in result set")
