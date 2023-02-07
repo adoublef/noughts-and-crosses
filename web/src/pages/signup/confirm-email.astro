@@ -66,26 +66,26 @@ const data = await Auth.signupVerify(token);
         event.preventDefault();
 
         const token = form.dataset.token!; //note should validate that the form email is the same as this token, on the backend
-        // const email = form.dataset.email!;
         const email = new FormData(form).get("email") as string; // NOTE may be vuneral still
         const username = new FormData(form).get("username") as string;
         const bio = new FormData(form).get("bio") as string;
-        // TODO: upload profile image
 
         // alert(JSON.stringify({ token, email, username, bio }));
 
-        const response = await User.create(token, email, username, bio); //NOTE replace with this line
-
-        // created profile is 201 but this is failing
-        switch (response.status) {
-            case 201:
-                alert("Successfully created profile");
-                break;
-            default:
-                alert("Unknown error");
-                break;
+        const data = await User.create(token, email, username, bio); //NOTE replace with this line
+        if (!data) {
+            alert("error occured on the server");
+            return;
         }
 
-        alert(JSON.stringify({ token, email, username, bio }));
+        // redirect to dashboard
+
+        alert(
+            `Welcome ${data.username} you will be redirected to the Dashboard`
+        );
+
+        // TODO redirect to the dashboard
+        //
+        // window.location.href = "/dashboard";
     });
 </script>

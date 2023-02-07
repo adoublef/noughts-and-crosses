@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	"github.com/hyphengolang/noughts-and-crosses/internal/reg"
 	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
@@ -138,7 +139,8 @@ func (s *Service) handleRegisterProfile() http.HandlerFunc {
 	}
 
 	type response struct {
-		Message string `json:"message"`
+		Username string `json:"username"`
+		Location string `json:"location"`
 	}
 
 	// should appear when sign-up confirm email returns authorized
@@ -152,11 +154,11 @@ func (s *Service) handleRegisterProfile() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// use the same token as signup confirm, this should be protected
 		{
-			// token, err := parse.ParseHeader(r)
-			// if err != nil {
-			// 	s.m.Respond(w, r, err, http.StatusBadRequest)
-			// 	return
-			// }
+			_, err := parse.ParseHeader(r)
+			if err != nil {
+				s.m.Respond(w, r, err, http.StatusUnauthorized)
+				return
+			}
 
 			// msg, err := events.EncodeSignupTokenMsg(token)
 			// if err != nil {
@@ -189,7 +191,10 @@ func (s *Service) handleRegisterProfile() http.HandlerFunc {
 
 		// TODO: send email to user with verification link
 		// TODO: Update Location header
-		s.m.Respond(w, r, true, http.StatusCreated)
+		s.m.Respond(w, r, response{
+			Username: q.Username,
+			Location: conf.ClientURI + "/todo",
+		}, http.StatusCreated)
 	}
 }
 
