@@ -24,6 +24,7 @@ func WithRandReader(r io.Reader) ClientOption {
 }
 
 type TokenClient interface {
+	ParseToken(token []byte) (jwt.Token, error)
 	// ParseRequest parses the request and returns the token
 	// if the token is valid, and returns an error otherwise
 	ParseRequest(r *http.Request) (jwt.Token, error)
@@ -32,7 +33,7 @@ type TokenClient interface {
 	ParseCookie(r *http.Request, cookieName string) (jwt.Token, error)
 	// GenerateToken generates a token with the given duration
 	// and subject. The token is signed with the key provided
-	GenerateToken(ctx context.Context, opts ...BuildOption) (Token, error)
+	GenerateToken(ctx context.Context, opts ...BuildOption) ([]byte, error)
 	// BlacklistToken blacklists the token
 	BlacklistToken(ctx context.Context, token jwt.Token) error
 }
@@ -56,6 +57,15 @@ func (c *tokenClient) ParseRequest(r *http.Request) (jwt.Token, error) {
 	return ParseRequest(r, key)
 }
 
+func (c *tokenClient) ParseToken(token []byte) (jwt.Token, error) {
+	key, err := c.key.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return ParseToken(token, key)
+}
+
 func (c *tokenClient) ParseCookie(r *http.Request, cookieName string) (jwt.Token, error) {
 	key, err := c.key.PublicKey()
 	if err != nil {
@@ -66,7 +76,7 @@ func (c *tokenClient) ParseCookie(r *http.Request, cookieName string) (jwt.Token
 }
 
 // GenerateToken implements TokenClient
-func (c *tokenClient) GenerateToken(ctx context.Context, opts ...BuildOption) (Token, error) {
+func (c *tokenClient) GenerateToken(ctx context.Context, opts ...BuildOption) ([]byte, error) {
 	return GenerateToken(ctx, c.key, opts...)
 }
 
