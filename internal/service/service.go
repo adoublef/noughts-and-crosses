@@ -26,6 +26,7 @@ func (*routerHandler) Decode(w http.ResponseWriter, r *http.Request, data any) e
 }
 
 func (*routerHandler) Respond(w http.ResponseWriter, r *http.Request, data any, status int) {
+	log.Printf("Responding with status %d; body: %v", status, data)
 	h.Respond(w, r, data, status)
 }
 
