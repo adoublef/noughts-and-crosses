@@ -35,9 +35,18 @@
             const response = await Auth.login(email);
 
             if (response.ok) {
-                const body = await response.json();
-                console.log(body);
-                alert("Check your email for a login link");
+                const { provider } = await response.json();
+                if (provider) {
+                    // append a link to the page if provider is not null
+                    const link = document.createElement("a");
+                    link.href = provider;
+                    link.textContent = `Check your email to complete the signup process`;
+                    document.body.appendChild(link);
+                } else {
+                    const p = document.createElement("p");
+                    p.textContent = `Check your email to complete the signup process`;
+                    document.body.appendChild(p);
+                }
             } else {
                 alert("Invalid email");
             }

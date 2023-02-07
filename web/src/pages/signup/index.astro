@@ -23,6 +23,8 @@
         </form>
 
         <a href="/login">Already registered?</a>
+
+        <!-- <a href="/" aria-disabled="true"></a> -->
     </body>
 </html>
 
@@ -43,10 +45,18 @@
 
             switch (response.status) {
                 case 202:
-                    const body = await response.json();
-                    alert(
-                        "Check your email for a account registration confirmation"
-                    );
+                    const { provider } = await response.json();
+                    if (provider) {
+                        // append a link to the page if provider is not null
+                        const link = document.createElement("a");
+                        link.href = provider;
+                        link.textContent = `Check your email to complete the signup process`;
+                        document.body.appendChild(link);
+                    } else {
+                        const p = document.createElement("p");
+                        p.textContent = `Check your email to complete the signup process`;
+                        document.body.appendChild(p);
+                    }
                     break;
                 case 400:
                     alert("Invalid email or username");
