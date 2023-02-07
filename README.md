@@ -46,3 +46,4 @@ GET /auth/v0/token
 - [magic links: all you need to know](https://www.smtp2go.com/blog/magic-links/)
 - [a guide to magic links](https://workos.com/blog/a-guide-to-magic-links)
 - [work os](https://workos.com/docs/magic-link/1-add-magic-link-to-your-app/add-a-callback-endpoint)
+
