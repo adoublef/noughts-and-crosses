@@ -56,8 +56,6 @@ async function mask<T>(method: Method, url: string, payload?: unknown, headers: 
         opts.body = JSON.stringify(payload);
     }
 
-    console.log("start");
-
     try {
         const response = await fetch(url, opts);
         if (!response.ok) {
@@ -67,8 +65,6 @@ async function mask<T>(method: Method, url: string, payload?: unknown, headers: 
         }
         return (await response.json()) as T;
     } catch (err) {
-        console.log("error", err);
-        // console.log("hello", err);
         const response = (err as Error).cause as Response;
         switch (response.status) {
             default:
