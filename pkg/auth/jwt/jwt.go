@@ -130,6 +130,11 @@ func WithPrivateClaims(claims PrivateClaims) BuildOption {
 
 type PrivateClaims map[string]any
 
+// Experimental
+func (c PrivateClaims) Append(key string, value any) {
+	c[key] = value
+}
+
 func Build(key jwk.Key, opts ...BuildOption) ([]byte, error) {
 	iss := "https://example.com"
 	aud := []string{"https://example.com"}
