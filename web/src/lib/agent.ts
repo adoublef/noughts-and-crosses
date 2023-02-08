@@ -3,10 +3,8 @@ export const User = {
 };
 
 export const Auth = {
-    /** I should be able to return the response body of the request in a type-safe way */
     login: (email: string) => send<{ provider: string; }>("post", "/auth/v0/login", { email }),
-    /** I should be able to return the response body of the request in a type-safe way */
-    loginVerify: (token: string | null = "") => send<boolean>("get", "/auth/v0/login", undefined, { Authorization: `Bearer ${token}` }),
+    loginVerify: (token: string | null = "") => send<{username:string}>("get", "/auth/v0/login", undefined, { Authorization: `Bearer ${token}` }),
     signup: (email: string) => send<{ provider: string; }>("post", "/registry/v0/signup", { email }),
     signupVerify: (token: string | null = "") => send<{ email: string; }>("get", "/registry/v0/signup", undefined, { Authorization: `Bearer ${token}` }),
 };
