@@ -1,0 +1,54 @@
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="generator" content={Astro.generator} />
+        <title>Signup | Create</title>
+    </head>
+    <body>
+        <h1>Astro</h1>
+
+        <h2>Sign up</h2>
+        <form id="signup">
+            <label for="email">
+                <span>Email</span>
+                <input type="email" name="email" id="email" required />
+            </label>
+            <button type="submit">Sign up</button>
+        </form>
+
+        <a href="/login">Already registered?</a>
+    </body>
+</html>
+
+<script>
+    import { Auth } from "../../lib/agent";
+
+    const form = document.querySelector<HTMLFormElement>("#signup");
+
+    form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const email = new FormData(form).get("email") as string;
+
+        const data = await Auth.signup(email);
+
+        if (!data) {
+            alert("Invalid email");
+            return;
+        }
+
+        if (data.provider) {
+            // append a link to the page if provider is not null
+            const link = document.createElement("a");
+            link.href = data.provider;
+            link.textContent = `Check your email to complete the signup process`;
+            document.body.appendChild(link);
+        } else {
+            const p = document.createElement("p");
+            p.textContent = `Check your email to complete the signup process`;
+            document.body.appendChild(p);
+        }
+    });
+</script>

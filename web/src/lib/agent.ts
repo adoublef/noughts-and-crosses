@@ -1,16 +1,20 @@
+export const User = {
+    create: (token: string, email: string, username: string, bio?: string) => send<{ location: string; username: string; }>("post", "/registry/v0/users", { email, username, bio }, { Authorization: `Bearer ${token}` }),
+};
+
 export const Auth = {
-    /** I should be able to return the response body of the request in a type-safe way */
-    verify: (token: string | null = "") => send("get", "/auth/v0/login", undefined, { Authorization: `Bearer ${token}` }),
-    /** I should be able to return the response body of the request in a type-safe way */
-    login: (email: string) => send("post", "/auth/v0/login", { email }),
+    login: (email: string) => send<{ provider: string; }>("post", "/auth/v0/login", { email }),
+    loginVerify: (token: string | null = "") => send<{username:string}>("get", "/auth/v0/login", undefined, { Authorization: `Bearer ${token}` }),
+    signup: (email: string) => send<{ provider: string; }>("post", "/registry/v0/signup", { email }),
+    signupVerify: (token: string | null = "") => send<{ email: string; }>("get", "/registry/v0/signup", undefined, { Authorization: `Bearer ${token}` }),
 };
 
 /** 
  * Does not throw an error, instead returns a 500 response
  * My API should always return a json object, then can clean this up
  */
-async function send(method: "post" | "get", url: string, payload?: any, headers: Record<string, string> = {}) {
-    let opts: RequestInit = { method, headers };
+async function send<T>(method: "post" | "get" | "delete", url: string, payload?: unknown, headers: Record<string, string> = {}) {
+    let opts: RequestInit = { method, headers, mode: "cors" };
 
     if (payload) {
         headers["Content-Type"] = "application/json";
@@ -18,9 +22,22 @@ async function send(method: "post" | "get", url: string, payload?: any, headers:
     }
 
     try {
-        return fetch(import.meta.env.PUBLIC_API_URI + url, opts);
+        const response = await fetch(import.meta.env.PUBLIC_API_URI + url, opts);
+        console.log(response.status, response.ok);
+        if (!response.ok) {
+            throw new Error("Bad fetch response", {
+                cause: response,
+            });
+        }
+        return (await response.json()) as T;
     } catch (err) {
-        return new Response(null, { status: 500 });
+        // const response = (err as Error).cause as Response;
+        // switch (response.status) {
+        //     default:
+        //         return null;
+        //         // return { err: true };
+        //     }
+        return null;
     }
 }
 
