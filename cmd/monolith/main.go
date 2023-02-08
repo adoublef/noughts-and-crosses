@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -50,7 +51,48 @@ func run() error {
 		AllowCredentials: true,
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	}).Handler)
+	{
+		mux.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"status": "get"}`))
+		})
 
+		mux.Post("/health", func(w http.ResponseWriter, r *http.Request) {
+			// decode the request body into a new `Post` struct
+			type request struct {
+				Hello string `json:"hello"`
+			}
+
+			var body request
+			err := json.NewDecoder(r.Body).Decode(&body)
+
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"status": "error"}`))
+				return
+			}
+
+			// find the sum of the all letters in Hello
+			sum := 0.0
+			for _, c := range body.Hello {
+				sum += float64(int(c) - 32)
+			}
+
+			avg := sum / float64(len(body.Hello))
+
+			type response struct {
+				Sum float64 `json:"sum"`
+				Avg float64 `json:"avg"`
+			}
+
+			// write the response
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response{Sum: sum, Avg: avg})
+		})
+	}
 	msv := newMailingService(nc)
 	mux.Mount("/mail/v0", msv)
 
