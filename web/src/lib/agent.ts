@@ -11,6 +11,10 @@ export const Auth = {
     signupVerify: (token: string | null = "") => send<{ email: string; }>("get", "/registry/v0/signup", undefined, { Authorization: `Bearer ${token}` }),
 };
 
+export const Ping = {
+    hello: (hello: string = "") => send<{ sum: number; }>("post", "/health", { hello }),
+};
+
 /** 
  * Does not throw an error, instead returns a 500 response
  * My API should always return a json object, then can clean this up
@@ -25,72 +29,19 @@ async function send<T>(method: Method, url: string, payload?: unknown, headers: 
 
     try {
         const response = await fetch(import.meta.env.PUBLIC_API_URI + url, opts);
-        console.log(response.status, response.ok);
         if (!response.ok) {
-            throw new Error("Bad fetch response", {
-                cause: response,
-            });
+            throw new Error("fetch error", { cause: response });
         }
         return (await response.json()) as T;
     } catch (err) {
-        // const response = (err as Error).cause as Response;
-        // switch (response.status) {
-        //     default:
-        //         return null;
-        //         // return { err: true };
-        //     }
-        return { error: -1 } as const;
-    }
-}
-
-export const Ping = {
-    hello: (hello: string = "") => mask<{ sum: number; }>("post", "/api/health", { hello }),
-    helloUnmasked: (hello: string = "") => send<{ sum: number; }>("post", "/health", { hello })
-};
-
-/** This should return the data or a custom response error */
-async function mask<T>(method: Method, url: string, payload?: unknown, headers: Record<string, string> = {}) {
-    let opts: RequestInit = { method, headers, mode: "cors" };
-
-    if (payload) {
-        headers["Content-Type"] = "application/json";
-        opts.body = JSON.stringify(payload);
-    }
-
-    try {
-        const response = await fetch(url, opts);
-        if (!response.ok) {
-            throw new Error("Bad fetch response", {
-                cause: response,
-            });
+        const { cause } = (err as Error);
+        if (!isResponse(cause)) {
+            return { error: -1 } as const;
         }
-        return (await response.json()) as T;
-    } catch (err) {
-        const response = (err as Error).cause as Response;
-        switch (response.status) {
+        switch (cause.status) {
             default:
-                return { error: response.status } as const;
+                return { error: cause.status } as const;
         }
     }
 }
 
-export async function api(method: Method, url: string, payload?: ReadableStream<Uint8Array> | null, headers: Record<string, string> = {}) {
-    let opts: RequestInit = { method, headers, mode: "cors" };
-
-    if (payload) {
-        headers["Content-Type"] = "application/json";
-        opts.body = payload;
-    }
-
-    try {
-        const response = await fetch(import.meta.env.API_URI + url, opts);
-        if (!isResponse(response)) {
-            throw new Error("Bad external API call", {
-                cause: response,
-            });
-        }
-        return response;
-    } catch (err) {
-        return new Response(JSON.stringify({ fatal: "system error" }), { status: 500 });
-    }
-}

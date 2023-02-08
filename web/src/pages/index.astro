@@ -20,11 +20,7 @@
 
         <p>This is triggering a masked url</p>
         <label>
-            <input id="input-masked" type="text" />
-            <output id="output-masked"></output>
-        </label>
-        <br />
-        <label>
+            <span>Masked</span>
             <input id="input" type="text" />
             <output id="output"></output>
         </label>
@@ -35,15 +31,13 @@
     import { Ping } from "../lib/agent";
     import { isAppError } from "../lib/errors";
 
-    const maskedInput =
-        document.querySelector<HTMLInputElement>("#input-masked")!;
-    const maskedOutput =
-        document.querySelector<HTMLOutputElement>("#output-masked")!;
+    const input = document.querySelector<HTMLInputElement>("#input")!;
+    const output = document.querySelector<HTMLOutputElement>("#output")!;
 
-    maskedInput.addEventListener("input", async (e) => {
+    input.addEventListener("input", async (e) => {
         const { value } = e.currentTarget as HTMLInputElement;
         if (!value) {
-            maskedOutput.textContent = `masked: The sum of "${value}": ${0}`;
+            output.textContent = `masked: The sum of "${value}": ${0}`;
             return;
         }
 
@@ -53,26 +47,6 @@
             return;
         }
 
-        maskedOutput.textContent = `masked: The sum of "${value}": ${data.sum}`;
-    });
-
-    // Unmasked input
-    const input = document.querySelector<HTMLInputElement>("#input")!;
-    const output = document.querySelector<HTMLOutputElement>("#output")!;
-
-    input.addEventListener("input", async (e) => {
-        const { value } = e.currentTarget as HTMLInputElement;
-        if (!value) {
-            output.textContent = `unmasked: The sum of "${value}": ${0}`;
-            return;
-        }
-
-        const data = await Ping.helloUnmasked(value);
-        if (isAppError(data)) {
-            console.error(data.error);
-            return;
-        }
-
-        output.textContent = `unmasked: The sum of "${value}": ${data.sum}`;
+        output.textContent = `masked: The sum of "${value}": ${data.sum}`;
     });
 </script>
