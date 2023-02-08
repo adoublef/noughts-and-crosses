@@ -85,51 +85,65 @@ func (s *Service) handleLogin() http.HandlerFunc {
 }
 
 func (s *Service) handleConfirmLogin() http.HandlerFunc {
-	// type response struct{
-	// 	OK bool `json:"ok"`
-	// }
+	type response struct {
+		Username     string  `json:"username"`
+		AccessToken  string  `json:"accessToken"`
+		RefreshToken string  `json:"refreshToken"`
+		PhotoURL     *string `json:"photoUrl"` //optional
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		_, err := s.tk.ParseRequest(r)
+		tk, err := s.tk.ParseRequest(r)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
 		}
 
-		// ask registry service if user exists
+		// TODO: ASK REGISTRY IF USER EXISTS OR NOT
+		email, _ := tk.PrivateClaims()["email"].(string)
 
-		// email, _ := tk.PrivateClaims()["email"].(string)
+		// TODO define a structure for this package
+		// raw, err := s.e.Request(&nats.Msg{Data: []byte(email)}, 5*time.Second)
+		// if err != nil {
+		// 	s.m.Respond(w, r, err, http.StatusNotFound)
+		// 	return
+		// }
 
-		// var (
-		// 	in  *nats.Msg
-		// 	out *nats.Msg
-		// 	err error
-		// )
+		// should include username, photoUrl & uid to be added to a jwt.
+		// data := struct {
+		// 	ID       uuid.UUID
+		// 	Username string
+		// 	PhotoURL *string //optional
+		// }{}
+		// if err := events.Decode(raw, &data); err != nil {
+		// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
+		// 	return
+		// }
 
-		// in = &nats.Msg{Subject: "profile.exists", Data: []byte(email)}
-		// out, err = s.e.Conn().RequestMsg(in, 5*time.Second)
+		// claims := jot.PrivateClaims{}
+		// claims := jot.PrivateClaims{
+		// 	"username": data.Username,
+		// 	"photoUrl": data.PhotoURL,
+		// }
+		// accessToken, _ := s.tk.GenerateToken(r.Context(), jot.WithEnd(30*time.Minute), jot.WithPrivateClaims(claims), jot.WithSubject(data.ID.String()))
+		// if err != nil {
+		// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
+		// 	return
+		// }
+		// claims["email"] = email
+		// refreshToken, _ := s.tk.GenerateToken(r.Context(), jot.WithEnd(7*24*time.Hour), jot.WithPrivateClaims(claims), jot.WithSubject(data.ID.String()))
 		// if err != nil {
 		// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
 		// 	return
 		// }
 
-		// // pointer to struct
-		// var p *struct {
-		// 	ID uuid.UUID
-		// 	// use a defined type
-		// 	Email string
-		// 	// use a defined type
-		// 	Username string
-		// 	// use a defined type
-		// 	PhotoURL string
-		// }
-
-		// if err := events.Decode(out.Data, p); err != nil {
-		// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
-		// 	return
-		// }
-		// create a session (using JWT)
-
-		s.m.Respond(w, r, true, http.StatusOK)
+		s.m.Respond(w, r, response{
+			// AccessToken:  string(accessToken),
+			// RefreshToken: string(refreshToken),
+			Username: "tmp:" + email,
+			// Username:     data.Username,
+			// PhotoURL:     data.PhotoURL,
+		}, http.StatusOK)
 	}
 }
 
