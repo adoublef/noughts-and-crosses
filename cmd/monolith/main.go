@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,34 +9,58 @@ import (
 	"github.com/go-chi/chi/v5"
 	auth "github.com/hyphengolang/noughts-and-crosses/internal/auth/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
+	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	mail "github.com/hyphengolang/noughts-and-crosses/internal/mailing/service"
-	reg "github.com/hyphengolang/noughts-and-crosses/internal/reg/service"
+	rreg "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
+	sreg "github.com/hyphengolang/noughts-and-crosses/internal/reg/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
 	jsonwebtoken "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/rs/cors"
 )
 
 func run() error {
+	ctx := context.Background()
+
 	nc, err := nats.Connect(conf.NATSURI, nats.UserJWTAndSeed(conf.NATSToken, conf.NATSSeed))
 	if err != nil {
 		return err
 	}
 	defer nc.Close()
 
+	conn, err := pgxpool.New(ctx, conf.DBURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	// ping the database
+	if err := conn.Ping(ctx); err != nil {
+		return err
+	}
+
 	mux := chi.NewRouter()
-	mux.Use(cors.Default().Handler)
+
+	mux.Use(cors.New(cors.Options{
+		AllowedOrigins:   []string{conf.ClientURI},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	}).Handler)
 
 	msv := newMailingService(nc)
 	mux.Mount("/mail/v0", msv)
 
-	rsv := newRegService(nc)
-	mux.Mount("/reg/v0", rsv)
+	rsv := newRegService(nc, conn)
+	mux.Mount("/registry/v0", rsv)
 
 	asv := newAuthService(nc)
 	mux.Mount("/auth/v0", asv)
 
-	// return http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", conf.PORT), mux)
+	log.Println("Listening on port", conf.PORT)
 	return http.ListenAndServe(fmt.Sprintf(":%d", conf.PORT), mux)
 }
 
@@ -45,24 +70,19 @@ func main() {
 	}
 }
 
-// example: POST http://localhost:8080/mailing/v0/send
 func newMailingService(nc *nats.Conn) *mail.Service {
-	// do not hard-code SMTP Port
-	e := smtp.NewMailer(conf.SMTPUsername, conf.SMTPPassword, conf.SMTPHost, 587)
-	srv := mail.New(e, nc)
-
-	return srv
+	em := smtp.NewMailer(conf.SMTPUsername, conf.SMTPPassword, conf.SMTPHost, 587)
+	ec := events.NewClient(nc)
+	return mail.New(em, ec)
 }
 
-func newRegService(nc *nats.Conn) *reg.Service {
-	srv := reg.New(nc)
-
-	return srv
+func newRegService(nc *nats.Conn, pg *pgxpool.Pool) *sreg.Service {
+	ec := events.NewClient(nc)
+	return sreg.New(ec, rreg.New(pg))
 }
 
 func newAuthService(nc *nats.Conn) *auth.Service {
 	tk := jsonwebtoken.NewTokenClient()
-	srv := auth.New(nc, tk)
-
-	return srv
+	ec := events.NewClient(nc)
+	return auth.New(ec, tk)
 }

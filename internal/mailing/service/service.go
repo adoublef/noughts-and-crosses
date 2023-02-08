@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/nats-io/nats.go"
@@ -16,22 +17,13 @@ import (
 	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
 )
 
-//go:embed templates/confirmation_email.html
-var confirmationEmail embed.FS
-
 var (
-// _, b, _, _ = runtime.Caller(0)
-// basepath   = filepath.Dir(b)
+	//go:embed templates/confirmation_login.html
+	confirmLogin embed.FS
+
+	//go:embed templates/confirmation_signup.html
+	confirmSignUp embed.FS
 )
-
-// func init() {
-// 	// _ = tpl
-
-// 	// tpl2 := template.Must(template.ParseFS(confirmationEmail, "templates/confirmation.html"))
-// 	// _ = tpl2
-// }
-
-var _ http.Handler = (*Service)(nil)
 
 type Service struct {
 	mux  chi.Router
@@ -43,11 +35,11 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-func New(smtp smtp.Mailer, nc *nats.Conn) *Service {
+func New(smtp smtp.Mailer, e events.Broker) *Service {
 	s := &Service{
 		mux:  chi.NewRouter(),
 		smtp: smtp,
-		e:    events.NewClient(nc),
+		e:    e,
 	}
 	go s.listen()
 	s.routes()
@@ -59,48 +51,115 @@ func (s *Service) routes() {
 }
 
 func (s *Service) listen() {
-	s.e.Subscribe(events.EventUserLogin, s.handleSendConfirmation())
+	s.e.Subscribe(events.EventSendLoginConfirm, s.handleLoginConfirm())
+	s.e.Subscribe(events.EventSendSignupConfirm, s.handleSignupConfirm())
 }
 
-func (s *Service) handleSendConfirmation() nats.MsgHandler {
+func (s *Service) handleSignupConfirm() nats.MsgHandler {
 	type renderArgs struct {
 		Href string
 	}
 
-	render, err := smtp.Render(confirmationEmail, "templates/confirmation_email.html")
+	render, err := smtp.Render(confirmSignUp, "templates/confirmation_signup.html")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return func(msg *nats.Msg) {
-		// EventUserLoginResponse
-		var data struct {
-			Email string
-			Token []byte
-		}
-		{
-			if err := events.Decode(msg.Data, &data); err != nil {
-				log.Println(err)
-				return
-			}
+	// NOTE this could be eventually cleaned up
+	newToken := func(data []byte) ([]byte, error) {
+		raw, err := s.e.Request(&nats.Msg{Subject: events.EventGenerateSignupToken, Data: data}, 5*time.Second)
+		if err != nil {
+			return nil, err
 		}
 
+		var tokGen events.DataEmailToken
+		if err := events.Decode(raw, &tokGen); err != nil {
+			return nil, err
+		}
+
+		return tokGen.Token, nil
+	}
+
+	send := func(to string, token []byte) error {
 		mail := &smtp.Mail{
-			To:   []string{data.Email},
-			Subj: "Confirm your email for your account",
+			To:   []string{to},
+			Subj: "Signup Confirmation",
 		}
 
 		args := &renderArgs{
-			Href: fmt.Sprintf("%s/get-started/confirm-email?token=%s", conf.ClientURI, string(data.Token)),
+			Href: fmt.Sprintf("%s/signup/confirm-email?token=%s", conf.ClientURI, string(token)),
 		}
 
-		_ = render(mail, args)
+		if err := render(mail, args); err != nil {
+			return err
+		}
 
-		if err := s.smtp.Send(mail); err != nil {
+		return s.smtp.Send(mail)
+	}
+
+	return func(msg *nats.Msg) {
+		var userIn events.DataSignUpConfirm
+		if err := events.Decode(msg.Data, &userIn); err != nil {
+			log.Println(err)
+			return
+		}
+
+		log.Println(userIn.Email)
+
+		tk, err := newToken(msg.Data)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		if err := send(userIn.Email, tk); err != nil {
 			log.Printf("sending email error: %v", err)
 			return
 		}
 
-		log.Printf("email sent to %s", data.Email)
+		log.Printf("email sent to %s", userIn.Email)
+	}
+}
+
+func (s *Service) handleLoginConfirm() nats.MsgHandler {
+	type renderArgs struct {
+		Href string
+	}
+
+	render, err := smtp.Render(confirmLogin, "templates/confirmation_login.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	send := func(to string, token []byte) error {
+		mail := &smtp.Mail{
+			To:   []string{to},
+			Subj: "Login Confirmation",
+		}
+
+		args := &renderArgs{
+			Href: fmt.Sprintf("%s/login/confirm-email?token=%s", conf.ClientURI, string(token)),
+		}
+
+		if err := render(mail, args); err != nil {
+			return err
+		}
+
+		return s.smtp.Send(mail)
+	}
+
+	return func(msg *nats.Msg) {
+		var userIn events.DataLoginConfirm
+		if err := events.Decode(msg.Data, &userIn); err != nil {
+			log.Println(err)
+			return
+		}
+
+		if err := send(userIn.Email, userIn.Token); err != nil {
+			log.Printf("sending email error: %v", err)
+			return
+		}
+
+		log.Printf("email sent to %s", userIn.Email)
 	}
 }

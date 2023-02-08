@@ -10,7 +10,6 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/hyphengolang/prelude v0.1.3
 	github.com/jackc/pgx/v5 v5.2.0
-	github.com/joho/godotenv v1.4.0
 	github.com/lestrrat-go/jwx/v2 v2.0.8
 	github.com/nats-io/nats.go v1.23.0
 	github.com/testcontainers/testcontainers-go v0.17.0

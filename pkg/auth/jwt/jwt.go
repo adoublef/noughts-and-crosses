@@ -61,6 +61,20 @@ func ParseRequest(r *http.Request, key jwk.Key) (jwt.Token, error) {
 	return jwt.ParseRequest(r, sep)
 }
 
+func ParseToken(token []byte, key jwk.Key) (jwt.Token, error) {
+	var sep jwt.SignEncryptParseOption
+	switch key := key.(type) {
+	case jwk.RSAPublicKey:
+		sep = jwt.WithKey(jwa.RS256, key)
+	case jwk.ECDSAPublicKey:
+		sep = jwt.WithKey(jwa.ES256, key)
+	default:
+		return nil, errors.New(`unsupported encryption`)
+	}
+
+	return jwt.Parse(token, sep)
+}
+
 func ParseCookie(r *http.Request, key jwk.Key, cookieName string) (jwt.Token, error) {
 	c, err := r.Cookie(cookieName)
 	if err != nil {
@@ -115,6 +129,11 @@ func WithPrivateClaims(claims PrivateClaims) BuildOption {
 }
 
 type PrivateClaims map[string]any
+
+// Experimental
+func (c PrivateClaims) Append(key string, value any) {
+	c[key] = value
+}
 
 func Build(key jwk.Key, opts ...BuildOption) ([]byte, error) {
 	iss := "https://example.com"
