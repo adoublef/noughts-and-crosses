@@ -44,7 +44,8 @@ async function send<T>(method: Method, url: string, payload?: unknown, headers: 
 }
 
 export const Ping = {
-    hello: (hello: string = "") => mask<{ sum: number; }>("post", "/api/health", { hello })
+    hello: (hello: string = "") => mask<{ sum: number; }>("post", "/api/health", { hello }),
+    helloUnmasked: (hello: string = "") => send<{ sum: number; }>("post", "/health", { hello })
 };
 
 /** This should return the data or a custom response error */
