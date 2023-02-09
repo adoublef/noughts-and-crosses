@@ -1,14 +1,14 @@
 import { isResponse, Method } from "./api/response";
 
 export const User = {
-    create: (token: string, email: string, username: string, bio?: string) => send<{ location: string; username: string; }>("post", "/registry/v0/users", { email, username, bio }, { Authorization: `Bearer ${token}` }),
+    create: (token: string, email: string, username: string, bio?: string) => send<{ location: string; username: string; }>("post", "/registry/users", { email, username, bio }, { Authorization: `Bearer ${token}` }),
 };
 
 export const Auth = {
-    login: (email: string) => send<{ provider: string; }>("post", "/auth/v0/login", { email }),
-    loginVerify: (token: string | null = "") => send<{ username: string; }>("get", "/auth/v0/login", undefined, { Authorization: `Bearer ${token}` }),
-    signup: (email: string) => send<{ provider: string; }>("post", "/registry/v0/signup", { email }),
-    signupVerify: (token: string | null = "") => send<{ email: string; }>("get", "/registry/v0/signup", undefined, { Authorization: `Bearer ${token}` }),
+    login: (email: string) => send<{ provider: string; }>("post", "/auth/login", { email }),
+    loginVerify: (token: string | null = "") => send<{ username: string; }>("get", "/auth/login", undefined, { Authorization: `Bearer ${token}` }),
+    signup: (email: string) => send<{ provider: string; }>("post", "/registry/signup", { email }),
+    signupVerify: (token: string | null = "") => send<{ email: string; }>("get", "/registry/signup", undefined, { Authorization: `Bearer ${token}` }),
 };
 
 export const Ping = {
