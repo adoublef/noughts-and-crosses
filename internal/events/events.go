@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/nats-io/nats.go"
 )
 
@@ -23,12 +24,17 @@ func Encode(v any) ([]byte, error) {
 type Event string
 
 const (
-	EventSendLoginConfirm    = "user.email.login"
-	EventSendSignupConfirm   = "user.email.signup"
-	EventGenerateLoginToken  = "token.generate.login" // NOTE not used
-	EventGenerateSignupToken = "token.generate.signup"
-	EventVerifySignupToken   = "token.verify.signup"
+	EventSendLoginConfirm        = "user.email.login"
+	EventSendSignupConfirm       = "user.email.signup"
+	EventGenerateLoginToken      = "token.generate.login" // NOTE not used
+	EventGenerateSignupToken     = "token.generate.signup"
+	EventVerifySignupToken       = "token.verify.signup"
+	EventCreateProfileValidation = "token.decode"
 )
+
+type DataJWTToken struct {
+	Token jwt.Token
+}
 
 // TODO implement Unmarshaler and Marshaler interfaces for binary encoding
 type DataSignUpConfirm struct {
@@ -46,7 +52,24 @@ type DataEmailToken struct {
 	Token []byte
 }
 
-func EncodeSignupVerifyMsg(token []byte) (*nats.Msg, error) {
+type DataAuthToken struct {
+	Token []byte
+	Email string
+}
+
+// TODO implement Error interface
+
+func NewCreateProfileValidationMsg(email string, token []byte) (*nats.Msg, error) {
+	v := DataAuthToken{Token: token, Email: email}
+	p, err := Encode(v)
+	if err != nil {
+		return nil, err
+	}
+
+	return &nats.Msg{Subject: EventCreateProfileValidation, Data: p}, nil
+}
+
+func NewSignupVerifyMsg(token []byte) (*nats.Msg, error) {
 	v := DataEmailToken{Token: token}
 	p, err := Encode(v)
 	if err != nil {
@@ -56,7 +79,7 @@ func EncodeSignupVerifyMsg(token []byte) (*nats.Msg, error) {
 	return &nats.Msg{Subject: EventVerifySignupToken, Data: p}, nil
 }
 
-func EncodeSendSignupConfirmMsg(email string) (*nats.Msg, error) {
+func NewSendSignupConfirmMsg(email string) (*nats.Msg, error) {
 	// send email to complete sign-up process
 	// automatically check which email provider so
 	// can send a link to the correct email provider
@@ -70,7 +93,7 @@ func EncodeSendSignupConfirmMsg(email string) (*nats.Msg, error) {
 	return &nats.Msg{Subject: EventSendSignupConfirm, Data: p}, nil
 }
 
-func EncodeLoginConfirmMsg(email string, token []byte) (*nats.Msg, error) {
+func NewLoginConfirmMsg(email string, token []byte) (*nats.Msg, error) {
 	data := DataLoginConfirm{Email: email, Token: token}
 	p, err := Encode(data)
 	if err != nil {
