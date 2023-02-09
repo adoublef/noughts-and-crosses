@@ -13,6 +13,7 @@ import (
 	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
 	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
+	"github.com/hyphengolang/noughts-and-crosses/pkg/results"
 )
 
 var _ http.Handler = (*Service)(nil)
@@ -69,7 +70,7 @@ func (s *Service) handleConfirmSignUp() http.HandlerFunc {
 
 		p := response{}
 		{
-			msg, err := events.EncodeSignupVerifyMsg(token)
+			msg, err := events.NewSignupVerifyMsg(token)
 			if err != nil {
 				s.m.Respond(w, r, err, http.StatusInternalServerError)
 				return
@@ -114,7 +115,7 @@ func (s *Service) handleSignUp() http.HandlerFunc {
 			return
 		}
 
-		msg, err := events.EncodeSendSignupConfirmMsg(q.Email)
+		msg, err := events.NewSendSignupConfirmMsg(q.Email)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
@@ -127,54 +128,66 @@ func (s *Service) handleSignUp() http.HandlerFunc {
 
 		s.m.Respond(w, r, response{
 			Provider: parse.ParseDomain(q.Email),
+			// VerificationToken: token,
 		}, http.StatusAccepted)
 	}
 }
 
+// should appear when sign-up confirm email returns authorized
+// the token has the email & username so that should be sent
+// here along with user bio (optional) and user image (also optional)
+// then on confirm, it will create the user profile
+// and redirect to dashboard.
+// Application already verified the email so no need to auth again.
+// NOTE: this means signup confirm only needs email address
+// add username can be provided at this endpoint. decluttering the API a bit
 func (s *Service) handleRegisterProfile() http.HandlerFunc {
+	type Result struct{ results.Result[struct{}] }
+
 	type request struct {
 		Email    string `json:"email"`
 		Username string `json:"username"`
 		Bio      string `json:"bio"`
 	}
 
+	auth := func(w http.ResponseWriter, r *http.Request, email string) error {
+		token, err := parse.ParseHeader(r)
+		if err != nil {
+			return err
+		}
+
+		msg, err := events.NewCreateProfileValidationMsg(email, token)
+		if err != nil {
+			return err
+		}
+
+		// this will be an a gob encoded message so needs to be decoded
+		p, err := s.e.Request(msg, 5*time.Second)
+		if err != nil {
+			return err
+		}
+
+		var auth Result
+		if err := events.Decode(p, &auth); err != nil {
+			return err
+		}
+
+		return auth.Err
+	}
+
 	type response struct {
 		Username string `json:"username"`
 		Location string `json:"location"`
 	}
-
-	// should appear when sign-up confirm email returns authorized
-	// the token has the email & username so that should be sent
-	// here along with user bio (optional) and user image (also optional)
-	// then on confirm, it will create the user profile
-	// and redirect to dashboard.
-	// Application already verified the email so no need to auth again.
-	// NOTE: this means signup confirm only needs email address
-	// add username can be provided at this endpoint. decluttering the API a bit
 	return func(w http.ResponseWriter, r *http.Request) {
-		// use the same token as signup confirm, this should be protected
-		{
-			_, err := parse.ParseHeader(r)
-			if err != nil {
-				s.m.Respond(w, r, err, http.StatusUnauthorized)
-				return
-			}
-
-			// msg, err := events.EncodeSignupTokenMsg(token)
-			// if err != nil {
-			// 	s.m.Respond(w, r, err, http.StatusInternalServerError)
-			// 	return
-			// }
-
-			// _, err = s.e.Request(msg, 5*time.Second)
-			// if err != nil {
-			// 	s.m.Respond(w, r, err, http.StatusBadRequest)
-			// 	return
-			// }
-		}
 		var q request
 		if err := s.m.Decode(w, r, &q); err != nil {
 			s.m.Respond(w, r, err, http.StatusBadRequest)
+			return
+		}
+
+		if err := auth(w, r, q.Email); err != nil {
+			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
 		}
 

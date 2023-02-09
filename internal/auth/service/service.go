@@ -11,6 +11,7 @@ import (
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
 	jot "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
+	"github.com/hyphengolang/noughts-and-crosses/pkg/results"
 
 	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
 )
@@ -67,7 +68,7 @@ func (s *Service) handleLogin() http.HandlerFunc {
 			return
 		}
 
-		msg, err := events.EncodeLoginConfirmMsg(q.Email, tk)
+		msg, err := events.NewLoginConfirmMsg(q.Email, tk)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
@@ -162,6 +163,38 @@ func (s *Service) handleRefreshToken() http.HandlerFunc {
 func (s *Service) listen() {
 	s.e.Subscribe(events.EventGenerateSignupToken, s.handleGenerateSignUpToken())
 	s.e.Subscribe(events.EventVerifySignupToken, s.handleVerifySignUpToken())
+	s.e.Subscribe(events.EventCreateProfileValidation, s.handleCreateProfileValidation())
+}
+
+func (s *Service) handleCreateProfileValidation() nats.MsgHandler {
+	type Result struct{ results.Result[struct{}] }
+
+	return func(msg *nats.Msg) {
+		var result Result
+
+		var data events.DataAuthToken
+		if err := events.Decode(msg.Data, &data); err != nil {
+			p := result.Errorf("failed to decode data: %v", err)
+			msg.Respond(p)
+			return
+		}
+
+		tk, err := s.tk.ParseToken(data.Token)
+		if err != nil {
+			p := result.Errorf("failed to parse token: %v", err)
+			msg.Respond(p)
+			return
+		}
+
+		if email := tk.PrivateClaims()["email"]; email != data.Email {
+			p := result.Errorf("something went wrong with the verifying identity")
+			msg.Respond(p)
+			return
+		}
+
+		// emails match so this is ok!
+		msg.Respond(result.Bytes())
+	}
 }
 
 func (s *Service) handleVerifySignUpToken() nats.MsgHandler {
