@@ -55,52 +55,19 @@ func run() error {
 		mux.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"status": "get"}`))
+			w.Write([]byte(`{"status": "ok"}`))
 		})
 
-		mux.Post("/health", func(w http.ResponseWriter, r *http.Request) {
-			// decode the request body into a new `Post` struct
-			type request struct {
-				Hello string `json:"hello"`
-			}
-
-			var body request
-			err := json.NewDecoder(r.Body).Decode(&body)
-
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"status": "error"}`))
-				return
-			}
-
-			// find the sum of the all letters in Hello
-			sum := 0.0
-			for _, c := range body.Hello {
-				sum += float64(int(c) - 32)
-			}
-
-			avg := sum / float64(len(body.Hello))
-
-			type response struct {
-				Sum float64 `json:"sum"`
-				Avg float64 `json:"avg"`
-			}
-
-			// write the response
-			w.WriteHeader(http.StatusOK)
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response{Sum: sum, Avg: avg})
-		})
+		mux.Post("/health", handlePing)
 	}
 	msv := newMailingService(nc)
-	mux.Mount("/mail/v0", msv)
+	mux.Mount("/mail", msv)
 
 	rsv := newRegService(nc, conn)
-	mux.Mount("/registry/v0", rsv)
+	mux.Mount("/registry", rsv)
 
 	asv := newAuthService(nc)
-	mux.Mount("/auth/v0", asv)
+	mux.Mount("/auth", asv)
 
 	log.Println("Listening on port", conf.PORT)
 	return http.ListenAndServe(fmt.Sprintf(":%d", conf.PORT), mux)
@@ -127,4 +94,39 @@ func newAuthService(nc *nats.Conn) *auth.Service {
 	tk := jsonwebtoken.NewTokenClient()
 	ec := events.NewClient(nc)
 	return auth.New(ec, tk)
+}
+
+func handlePing(w http.ResponseWriter, r *http.Request) {
+	// decode the request body into a new `Post` struct
+	type request struct {
+		Hello string `json:"hello"`
+	}
+
+	var body request
+	err := json.NewDecoder(r.Body).Decode(&body)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status": "error"}`))
+		return
+	}
+
+	// find the sum of the all letters in Hello
+	sum := 0.0
+	for _, c := range body.Hello {
+		sum += float64(int(c) - 32)
+	}
+
+	avg := sum / float64(len(body.Hello))
+
+	type response struct {
+		Sum float64 `json:"sum"`
+		Avg float64 `json:"avg"`
+	}
+
+	// write the response
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response{Sum: sum, Avg: avg})
 }
