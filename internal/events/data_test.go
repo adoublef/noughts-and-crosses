@@ -1,11 +1,11 @@
-package results_test
+package events_test
 
 import (
 	"bytes"
 	"encoding/gob"
 	"testing"
 
-	"github.com/hyphengolang/noughts-and-crosses/pkg/results"
+	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	"github.com/hyphengolang/prelude/testing/is"
 )
 
@@ -13,29 +13,29 @@ func TestEncoding(t *testing.T) {
 	is := is.New(t)
 
 	t.Run("result with empty struct", func(t *testing.T) {
-		type Result struct{ results.Result[struct{}] }
-		var result Result
+		type Data struct{ events.Data[struct{}] }
+		var data Data
 
 		var buf bytes.Buffer
-		err := gob.NewEncoder(&buf).Encode(result)
+		err := gob.NewEncoder(&buf).Encode(data)
 		is.NoErr(err) // encoding result type
 
 		p := buf.Bytes()
-		err = gob.NewDecoder(bytes.NewReader(p)).Decode(&result)
+		err = gob.NewDecoder(bytes.NewReader(p)).Decode(&data)
 		is.NoErr(err) // decoding result type
 
-		is.True(result.Value == struct{}{}) // value is struct{}{}
+		is.True(data.Value == struct{}{}) // value is struct{}{}
 	})
 
 	t.Run("result.Bytes happy", func(t *testing.T) {
-		type Result struct{ results.Result[int] }
+		type Data struct{ events.Data[int] }
 
-		var input Result
+		var input Data
 		input.Value = 10 // value is 0
 		// been gob encoded
 		p := input.Bytes()
 
-		var output Result
+		var output Data
 		err := gob.NewDecoder(bytes.NewReader(p)).Decode(&output)
 		is.NoErr(err) // decoding result type
 
@@ -44,15 +44,15 @@ func TestEncoding(t *testing.T) {
 	})
 
 	t.Run("result.Bytes error", func(t *testing.T) {
-		type Result struct{ results.Result[struct{}] }
+		type Data struct{ events.Data[struct{}] }
 
-		var input Result
+		var input Data
 		p := input.Errorf("test error")
 
 		is.True(len(p) > 0)       // bytes are returned
 		is.True(input.Err != nil) // error is set
 
-		var output Result
+		var output Data
 		err := gob.NewDecoder(bytes.NewReader(p)).Decode(&output)
 		is.NoErr(err) // decoding result type
 
@@ -61,15 +61,15 @@ func TestEncoding(t *testing.T) {
 	})
 
 	t.Run("result.Bytes error", func(t *testing.T) {
-		type Result struct{ results.Result[struct{}] }
+		type Data struct{ events.Data[struct{}] }
 
-		var input Result
+		var input Data
 		p := input.Errorf("test error")
 
 		is.True(len(p) > 0)       // bytes are returned
 		is.True(input.Err != nil) // error is set
 
-		var output Result
+		var output Data
 		err := gob.NewDecoder(bytes.NewReader(p)).Decode(&output)
 		is.NoErr(err) // decoding result type
 		is.Equal(output.Err.Error(), "test error")

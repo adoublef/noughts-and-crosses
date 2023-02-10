@@ -8,17 +8,26 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-func Decode(p []byte, v any) error {
+// Unmarshal is a helper to decode byte slices back to their
+// original struct. It performs the reverse task of `Encode`
+func Unmarshal(p []byte, v any) error {
 	return gob.NewDecoder(bytes.NewReader(p)).Decode(v)
 }
 
-func Encode(v any) ([]byte, error) {
+// Marshal uses gob encoding to convert any struct type to
+// a bytes slice. Custom types may need to be registered first
+func Marshal(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(v); err != nil {
 		return nil, err
 	}
 
 	return buf.Bytes(), nil
+}
+
+// Redirect is a helper to re-use the previous message data for a different subject
+func Redirect(subj string, src *nats.Msg) (dst *nats.Msg) {
+	return &nats.Msg{Subject: subj, Data: src.Data}
 }
 
 type Event string
@@ -36,18 +45,15 @@ type DataJWTToken struct {
 	Token jwt.Token
 }
 
-// TODO implement Unmarshaler and Marshaler interfaces for binary encoding
 type DataSignUpConfirm struct {
 	Email string
 }
 
-// TODO implement Unmarshaler and Marshaler interfaces for binary encoding
 type DataLoginConfirm struct {
 	Email string
 	Token []byte
 }
 
-// TODO implement Unmarshaler and Marshaler interfaces for binary encoding
 type DataEmailToken struct {
 	Token []byte
 }
@@ -61,7 +67,7 @@ type DataAuthToken struct {
 
 func NewCreateProfileValidationMsg(email string, token []byte) (*nats.Msg, error) {
 	v := DataAuthToken{Token: token, Email: email}
-	p, err := Encode(v)
+	p, err := Marshal(v)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +77,7 @@ func NewCreateProfileValidationMsg(email string, token []byte) (*nats.Msg, error
 
 func NewSignupVerifyMsg(token []byte) (*nats.Msg, error) {
 	v := DataEmailToken{Token: token}
-	p, err := Encode(v)
+	p, err := Marshal(v)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +91,7 @@ func NewSendSignupConfirmMsg(email string) (*nats.Msg, error) {
 	// can send a link to the correct email provider
 	// https://www.freecodecamp.org/news/the-best-free-email-providers-2021-guide-to-online-email-account-services/
 	data := DataSignUpConfirm{Email: email}
-	p, err := Encode(data)
+	p, err := Marshal(data)
 	if err != nil {
 		return nil, err
 	}
@@ -93,9 +99,9 @@ func NewSendSignupConfirmMsg(email string) (*nats.Msg, error) {
 	return &nats.Msg{Subject: EventSendSignupConfirm, Data: p}, nil
 }
 
-func NewLoginConfirmMsg(email string, token []byte) (*nats.Msg, error) {
+func NewSendLoginConfirmMsg(email string, token []byte) (*nats.Msg, error) {
 	data := DataLoginConfirm{Email: email, Token: token}
-	p, err := Encode(data)
+	p, err := Marshal(data)
 	if err != nil {
 		return nil, err
 	}
