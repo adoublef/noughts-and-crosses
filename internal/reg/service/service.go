@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -13,10 +12,7 @@ import (
 	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
 	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
-	"github.com/hyphengolang/noughts-and-crosses/pkg/results"
 )
-
-var _ http.Handler = (*Service)(nil)
 
 type Service struct {
 	m service.Router
@@ -42,10 +38,10 @@ func New(e events.Broker, r repo.Repo) *Service {
 
 func (s *Service) routes() {
 	s.m.Post("/signup", s.handleSignUp())
-	s.m.Get("/signup", s.handleConfirmSignUp())
+	// NOTE: may be more appropriate for this to hang on auth service
+	s.m.Get("/signup", s.handleVerifySignup())
 
 	s.m.Post("/users", s.handleRegisterProfile())
-	s.m.Get("/users/verify", s.handleVerifyRegistration())
 
 	// r := s.m.With(service.PathParam("uuid", uuidParser))
 	// r.Delete("/users/{uuid}", s.handleTermination())
@@ -54,48 +50,53 @@ func (s *Service) routes() {
 	// r.Put("/users/{uuid}/profile/photo-url", s.handleSetPhotoURL())
 }
 
-func (s *Service) handleConfirmSignUp() http.HandlerFunc {
+func (s *Service) handleVerifySignup() http.HandlerFunc {
+	type Data struct {
+		events.Data[string]
+	}
+
 	type response struct {
 		Email string `json:"email"`
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println(r.URL.String())
+	confirm := func(r *http.Request, token []byte, timeout time.Duration) (email string, err error) {
+		msg, err := events.NewSignupVerifyMsg(token)
+		if err != nil {
+			return
+		}
 
+		// get the email from token, parsed from auth
+		out, err := s.e.Request(msg, 5*time.Second)
+		if err != nil {
+			return
+		}
+
+		var reply Data
+		if err = events.Unmarshal(out, &reply); err != nil {
+			return
+		}
+
+		return reply.Value, reply.Err
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
 		token, err := parse.ParseHeader(r)
 		if err != nil {
+			// log.Printf("parsing header")
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
 		}
 
-		p := response{}
-		{
-			msg, err := events.NewSignupVerifyMsg(token)
-			if err != nil {
-				s.m.Respond(w, r, err, http.StatusInternalServerError)
-				return
-			}
-
-			// get the email from token, parsed from auth
-			out, err := s.e.Request(msg, 5*time.Second)
-			if err != nil {
-				s.m.Respond(w, r, err, http.StatusInternalServerError)
-				return
-			}
-
-			var raw struct {
-				Email string
-			}
-
-			if err := events.Decode(out, &raw); err != nil {
-				s.m.Respond(w, r, err, http.StatusInternalServerError)
-				return
-			}
-
-			p.Email = raw.Email
+		email, err := confirm(r, token, 5*time.Second)
+		if err != nil {
+			// log.Printf("parsing token")
+			s.m.Respond(w, r, err, http.StatusUnauthorized)
+			return
 		}
 
-		fmt.Println(p)
+		p := response{
+			Email: email,
+		}
 		s.m.Respond(w, r, p, http.StatusOK)
 	}
 }
@@ -142,7 +143,7 @@ func (s *Service) handleSignUp() http.HandlerFunc {
 // NOTE: this means signup confirm only needs email address
 // add username can be provided at this endpoint. decluttering the API a bit
 func (s *Service) handleRegisterProfile() http.HandlerFunc {
-	type Result struct{ results.Result[struct{}] }
+	type Data struct{ events.Data[struct{}] }
 
 	type request struct {
 		Email    string `json:"email"`
@@ -167,8 +168,8 @@ func (s *Service) handleRegisterProfile() http.HandlerFunc {
 			return err
 		}
 
-		var auth Result
-		if err := events.Decode(p, &auth); err != nil {
+		var auth Data
+		if err := events.Unmarshal(p, &auth); err != nil {
 			return err
 		}
 
@@ -176,8 +177,8 @@ func (s *Service) handleRegisterProfile() http.HandlerFunc {
 	}
 
 	type response struct {
-		Username string `json:"username"`
-		Location string `json:"location"`
+		Username   string `json:"username"`
+		ProfileURL string `json:"profileUrl"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		var q request
@@ -205,8 +206,8 @@ func (s *Service) handleRegisterProfile() http.HandlerFunc {
 		// TODO: send email to user with verification link
 		// TODO: Update Location header
 		s.m.Respond(w, r, response{
-			Username: q.Username,
-			Location: conf.ClientURI + "/todo",
+			Username:   q.Username,
+			ProfileURL: conf.ClientURI + "/todo",
 		}, http.StatusCreated)
 	}
 }
@@ -301,12 +302,6 @@ func (s *Service) handleSetProfile() http.HandlerFunc {
 
 		// profile created. add location header
 		s.m.Respond(w, r, nil, http.StatusOK)
-	}
-}
-
-func (s *Service) handleVerifyRegistration() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// get token from url param and verify with the token stored in database
 	}
 }
 
