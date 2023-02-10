@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	auth "github.com/hyphengolang/noughts-and-crosses/internal/auth/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
@@ -42,24 +43,22 @@ func run() error {
 	}
 
 	mux := chi.NewRouter()
-
-	mux.Use(cors.New(cors.Options{
-		AllowedOrigins:   []string{conf.ClientURI},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300, // Maximum value not ignored by any of major browsers
-	}).Handler)
+	// root
 	{
-		mux.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"status": "ok"}`))
-		})
-
+		opt := cors.Options{
+			AllowedOrigins:   []string{conf.ClientURI},
+			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+			ExposedHeaders:   []string{"Link"},
+			AllowCredentials: true,
+			MaxAge:           300, // Maximum value not ignored by any of major browsers
+		}
+		mux.Use(cors.New(opt).Handler)
+		mux.Use(middleware.Logger)
+		mux.Use(middleware.Recoverer)
 		mux.Post("/health", handlePing)
 	}
+
 	msv := newMailingService(nc)
 	mux.Mount("/mail", msv)
 
