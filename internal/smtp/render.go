@@ -7,8 +7,8 @@ import (
 	"sync"
 )
 
-// Rendering
-type RenderFunc func(m *Mail, data any) error
+// RenderFunc returns a mail type
+type RenderFunc func(data any, subj string, to ...string) (*Mail, error)
 
 func Render(fs fs.FS, filenames ...string) (render RenderFunc, err error) {
 	var (
@@ -20,14 +20,19 @@ func Render(fs fs.FS, filenames ...string) (render RenderFunc, err error) {
 
 	init.Do(func() { tpl, err = template.ParseFS(fs, filenames...) })
 
-	render = func(m *Mail, data any) error {
+	render = func(data any, subj string, to ...string) (*Mail, error) {
 		sb = &bytes.Buffer{}
 		if err = tpl.Execute(sb, data); err != nil {
-			return err
+			return nil, err
 		}
 
-		m.Body = sb.Bytes()
-		return nil
+		m := &Mail{
+			To:   to,
+			Subj: subj,
+			Body: sb.Bytes(),
+		}
+
+		return m, nil
 	}
 
 	return
