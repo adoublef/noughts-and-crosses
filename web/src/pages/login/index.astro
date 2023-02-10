@@ -23,7 +23,7 @@
 </html>
 
 <script>
-    import { Auth } from "../../lib/agent";
+    import { Auth } from "@lib/agent";
 
     const form = document.querySelector<HTMLFormElement>("#login");
 
@@ -32,9 +32,8 @@
 
         const email = new FormData(form).get("email") as string;
 
-        const data = await Auth.login(email);
-        // console.log(response.status, response.ok);
-        if (!data) {
+        const data = await Auth.login.attempt(email);
+        if ("error" in data) {
             alert("Error occured");
             return;
         }

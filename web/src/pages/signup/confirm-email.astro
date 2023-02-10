@@ -1,9 +1,9 @@
 ---
-import { Auth } from "../../lib/agent";
+import { User } from "@lib/agent";
 
 const token = Astro.url.searchParams.get("token");
 
-const data = await Auth.signupVerify(token);
+const data = await User.signup.confirm(token);
 ---
 
 <html lang="en">
@@ -58,7 +58,7 @@ const data = await Auth.signupVerify(token);
 </html>
 
 <script>
-    import { User } from "../../lib/agent";
+    import { User } from "@lib/agent";
 
     const form = document.querySelector<HTMLFormElement>("#profile");
 

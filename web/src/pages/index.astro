@@ -28,8 +28,7 @@
 </html>
 
 <script>
-    import { Ping } from "../lib/agent";
-    import { isAppError } from "../lib/errors";
+    import { Ping } from "@lib/agent";
 
     const input = document.querySelector<HTMLInputElement>("#input")!;
     const output = document.querySelector<HTMLOutputElement>("#output")!;
@@ -42,10 +41,7 @@
         }
 
         const data = await Ping.hello(value);
-        if (isAppError(data)) {
-            console.error(data.error);
-            return;
-        }
+        if ("error" in data) return;
 
         output.textContent = `masked: The sum of "${value}": ${data.sum}`;
     });
