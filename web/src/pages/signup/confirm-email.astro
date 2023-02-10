@@ -17,7 +17,12 @@ const data = await User.signup.confirm(token);
     <body>
         <h1>Astro</h1>
         {
-            "email" in data ? (
+            "error" in data ? (
+                <>
+                    <p>Not authorized</p>
+                    <p>An error occured, please try again or contact support</p>
+                </>
+            ) : (
                 <>
                     <p>Authorized, complete signup</p>
                     <form id="profile" data-token={token}>
@@ -46,11 +51,6 @@ const data = await User.signup.confirm(token);
                         </label>
                         <button type="submit">Sign up</button>
                     </form>
-                </>
-            ) : (
-                <>
-                    <p>Not authorized</p>
-                    <p>An error occured, please try again or contact support</p>
                 </>
             )
         }

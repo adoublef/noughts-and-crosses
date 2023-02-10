@@ -5,7 +5,6 @@ const token = Astro.url.searchParams.get("token")!;
 
 // either 200 or 401
 const data = await Auth.login.confirm(token);
-// console.log({ data });
 ---
 
 <html lang="en">
