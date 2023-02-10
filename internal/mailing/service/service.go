@@ -150,7 +150,5 @@ func (s *Service) handleLoginConfirm() nats.MsgHandler {
 			log.Printf("sending email error: %v", err)
 			return
 		}
-
-		log.Printf("email sent to %s", userIn.Email)
 	}
 }
