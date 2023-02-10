@@ -13,7 +13,36 @@
     </head>
     <body>
         <h1>Astro with Vercel</h1>
-        <a href="/signup">Signup</a>
-        <a href="/login">Login</a>
+        <div>
+            <a href="/signup">Signup</a>
+            <a href="/login">Login</a>
+        </div>
+
+        <p>This is triggering a masked url</p>
+        <label>
+            <span>Masked</span>
+            <input id="input" type="text" />
+            <output id="output"></output>
+        </label>
     </body>
 </html>
+
+<script>
+    import { Ping } from "@lib/agent";
+
+    const input = document.querySelector<HTMLInputElement>("#input")!;
+    const output = document.querySelector<HTMLOutputElement>("#output")!;
+
+    input.addEventListener("input", async (e) => {
+        const { value } = e.currentTarget as HTMLInputElement;
+        if (!value) {
+            output.textContent = `masked: The sum of "${value}": ${0}`;
+            return;
+        }
+
+        const data = await Ping.hello(value);
+        if ("error" in data) return;
+
+        output.textContent = `masked: The sum of "${value}": ${data.sum}`;
+    });
+</script>

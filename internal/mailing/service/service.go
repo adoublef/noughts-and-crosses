@@ -51,97 +51,88 @@ func (s *Service) routes() {
 }
 
 func (s *Service) listen() {
+	// response needed from `auth`
 	s.e.Subscribe(events.EventSendLoginConfirm, s.handleLoginConfirm())
 	s.e.Subscribe(events.EventSendSignupConfirm, s.handleSignupConfirm())
 }
 
 func (s *Service) handleSignupConfirm() nats.MsgHandler {
-	type renderArgs struct {
+	type Args struct {
 		Href string
 	}
 
 	render, err := smtp.Render(confirmSignUp, "templates/confirmation_signup.html")
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	// NOTE this could be eventually cleaned up
-	newToken := func(data []byte) ([]byte, error) {
-		raw, err := s.e.Request(&nats.Msg{Subject: events.EventGenerateSignupToken, Data: data}, 5*time.Second)
-		if err != nil {
-			return nil, err
-		}
-
-		var tokGen events.DataEmailToken
-		if err := events.Decode(raw, &tokGen); err != nil {
-			return nil, err
-		}
-
-		return tokGen.Token, nil
+		log.Fatalf("render confirmation signup: %v", err)
 	}
 
 	send := func(to string, token []byte) error {
-		mail := &smtp.Mail{
-			To:   []string{to},
-			Subj: "Signup Confirmation",
-		}
-
-		args := &renderArgs{
+		args := &Args{
 			Href: fmt.Sprintf("%s/signup/confirm-email?token=%s", conf.ClientURI, string(token)),
 		}
 
-		if err := render(mail, args); err != nil {
+		mail, err := render(args, "Signup Confirmation", to)
+		if err != nil {
 			return err
 		}
 
 		return s.smtp.Send(mail)
 	}
 
-	return func(msg *nats.Msg) {
-		var userIn events.DataSignUpConfirm
-		if err := events.Decode(msg.Data, &userIn); err != nil {
-			log.Println(err)
-			return
-		}
+	request := func(msg *nats.Msg) (token []byte, err error) {
+		type Data struct{ events.Data[[]byte] }
 
-		log.Println(userIn.Email)
-
-		tk, err := newToken(msg.Data)
+		msg = events.Redirect(events.EventGenerateSignupToken, msg)
+		raw, err := s.e.Request(msg, 5*time.Second)
 		if err != nil {
-			log.Println(err)
 			return
 		}
 
-		if err := send(userIn.Email, tk); err != nil {
-			log.Printf("sending email error: %v", err)
+		var reply Data
+		if err := events.Unmarshal(raw, &reply); err != nil {
+			return nil, err
+		}
+
+		return reply.Value, reply.Err
+	}
+
+	return func(msg *nats.Msg) {
+		var in events.DataSignUpConfirm
+		if err := events.Unmarshal(msg.Data, &in); err != nil {
+			log.Printf("gob decoding: %v", err)
 			return
 		}
 
-		log.Printf("email sent to %s", userIn.Email)
+		token, err := request(msg)
+		if err != nil {
+			log.Printf("parsing token: %v", err)
+			return
+		}
+
+		if err := send(in.Email, token); err != nil {
+			log.Printf("sending email: %v", err)
+			return
+		}
 	}
 }
 
 func (s *Service) handleLoginConfirm() nats.MsgHandler {
-	type renderArgs struct {
+	type Args struct {
 		Href string
 	}
 
 	render, err := smtp.Render(confirmLogin, "templates/confirmation_login.html")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("render confirmation login: %v", err)
 	}
 
 	send := func(to string, token []byte) error {
-		mail := &smtp.Mail{
-			To:   []string{to},
-			Subj: "Login Confirmation",
-		}
-
-		args := &renderArgs{
+		args := &Args{
 			Href: fmt.Sprintf("%s/login/confirm-email?token=%s", conf.ClientURI, string(token)),
 		}
 
-		if err := render(mail, args); err != nil {
+		mail, err := render(args, "Login Confirmation", to)
+		if err != nil {
 			return err
 		}
 
@@ -150,7 +141,7 @@ func (s *Service) handleLoginConfirm() nats.MsgHandler {
 
 	return func(msg *nats.Msg) {
 		var userIn events.DataLoginConfirm
-		if err := events.Decode(msg.Data, &userIn); err != nil {
+		if err := events.Unmarshal(msg.Data, &userIn); err != nil {
 			log.Println(err)
 			return
 		}
@@ -159,7 +150,5 @@ func (s *Service) handleLoginConfirm() nats.MsgHandler {
 			log.Printf("sending email error: %v", err)
 			return
 		}
-
-		log.Printf("email sent to %s", userIn.Email)
 	}
 }

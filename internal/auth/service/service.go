@@ -10,26 +10,26 @@ import (
 
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
-	jot "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
+	token "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
 
 	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
 )
 
 type Service struct {
-	m  service.Router
-	e  events.Broker
-	tk jot.TokenClient
+	m service.Router
+	e events.Broker
+	t token.Client
 }
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.m.ServeHTTP(w, r)
 }
 
-func New(e events.Broker, tk jot.TokenClient) *Service {
+func New(e events.Broker, t token.Client) *Service {
 	s := &Service{
-		m:  service.NewRouter(),
-		e:  e,
-		tk: tk,
+		m: service.NewRouter(),
+		e: e,
+		t: t,
 	}
 	go s.listen()
 	s.routes()
@@ -61,13 +61,13 @@ func (s *Service) handleLogin() http.HandlerFunc {
 			return
 		}
 
-		tk, err := s.tk.GenerateToken(context.Background(), jot.WithEnd(5*time.Minute), jot.WithPrivateClaims(jot.PrivateClaims{"email": q.Email}))
+		tk, err := s.t.GenerateToken(context.Background(), token.WithEnd(5*time.Minute), token.WithPrivateClaims(token.PrivateClaims{"email": q.Email}))
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
-		msg, err := events.EncodeLoginConfirmMsg(q.Email, tk)
+		msg, err := events.NewSendLoginConfirmMsg(q.Email, tk)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
@@ -93,7 +93,7 @@ func (s *Service) handleConfirmLogin() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		tk, err := s.tk.ParseRequest(r)
+		tk, err := s.t.ParseRequest(r)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
@@ -160,85 +160,112 @@ func (s *Service) handleRefreshToken() http.HandlerFunc {
 }
 
 func (s *Service) listen() {
-	s.e.Subscribe(events.EventGenerateSignupToken, s.handleGenerateSignUpToken())
-	s.e.Subscribe(events.EventVerifySignupToken, s.handleVerifySignUpToken())
+	// responds back to `mailing`
+	s.e.Subscribe(events.EventGenerateSignupToken, s.generateSignupToken())
+	// responds back to `registry`
+	s.e.Subscribe(events.EventVerifySignupToken, s.verifySignupToken())
+	// responds back to `registry`
+	s.e.Subscribe(events.EventCreateProfileValidation, s.verifyCreateProfileToken())
 }
 
-func (s *Service) handleVerifySignUpToken() nats.MsgHandler {
-	type A struct {
-		Email string
+func (s *Service) verifyCreateProfileToken() nats.MsgHandler {
+	type Data struct{ events.Data[struct{}] }
+
+	return func(msg *nats.Msg) {
+		var result Data
+
+		var data events.DataAuthToken
+		if err := events.Unmarshal(msg.Data, &data); err != nil {
+			p := result.Errorf("failed to decode data: %v", err)
+			msg.Respond(p)
+			return
+		}
+
+		tk, err := s.t.ParseToken(data.Token)
+		if err != nil {
+			p := result.Errorf("failed to parse token: %v", err)
+			msg.Respond(p)
+			return
+		}
+
+		if email := tk.PrivateClaims()["email"]; email != data.Email {
+			p := result.Errorf("something went wrong with the verifying identity")
+			msg.Respond(p)
+			return
+		}
+
+		// emails match so this is ok!
+		msg.Respond(result.Bytes())
+	}
+}
+
+func (s *Service) verifySignupToken() nats.MsgHandler {
+	type Data struct {
+		events.Data[string]
 	}
 
 	return func(msg *nats.Msg) {
-		var tokVal events.DataEmailToken
-		if err := events.Decode(msg.Data, &tokVal); err != nil {
-			log.Println(err)
+		var reply Data
+
+		var in events.DataEmailToken
+		if err := events.Unmarshal(msg.Data, &in); err != nil {
+			msg.Respond(reply.Errorf("decode msg: %v", err))
 			return
 		}
 
-		tk, err := s.tk.ParseToken(tokVal.Token)
+		tk, err := s.t.ParseToken(in.Token)
 		if err != nil {
-			log.Println(err)
+			msg.Respond(reply.Errorf("parse token: %v", err))
 			return
 		}
 
-		email, _ := tk.PrivateClaims()["email"].(string)
-		{
-			raw := A{
-				Email: email,
-			}
-			p, err := events.Encode(raw)
-			if err != nil {
-				log.Println(err)
-				return
-			}
+		// Could be work checking
+		email := tk.PrivateClaims()["email"].(string)
+		// {
+		reply.Value = email
+		msg.Respond(reply.Bytes())
+		// raw := A{
+		// 	Email: email,
+		// }
+		// p, err := events.Encode(raw)
+		// if err != nil {
+		// 	log.Println(err)
+		// 	return
+		// }
 
-			if err := msg.Respond(p); err != nil {
-				log.Println(err)
-				return
-			}
-		}
-
+		// if err := msg.Respond(p); err != nil {
+		// 	log.Println(err)
+		// 	return
+		// }
+		// }
 		log.Println("email", email)
 	}
 }
 
-func (s *Service) handleGenerateSignUpToken() nats.MsgHandler {
-	// NOTE move to events package when I can thing of a decent abstraction
-	newReplyMsg := func(subj string, email string) (*nats.Msg, error) {
-		encTk, err := s.tk.GenerateToken(context.Background(), jot.WithEnd(5*time.Minute), jot.WithPrivateClaims(jot.PrivateClaims{"email": email}))
-		if err != nil {
-			return nil, err
-		}
-
-		// reply
-		tokenGen := events.DataEmailToken{Token: encTk}
-		p, err := events.Encode(tokenGen)
-		if err != nil {
-			return nil, err
-		}
-
-		return &nats.Msg{Subject: subj, Data: p}, nil
-	}
+func (s *Service) generateSignupToken() nats.MsgHandler {
+	type Data struct{ events.Data[[]byte] }
 
 	return func(msg *nats.Msg) {
-		var tokenBd events.DataSignUpConfirm
-		if err := events.Decode(msg.Data, &tokenBd); err != nil {
+		var reply Data
+
+		var in events.DataSignUpConfirm
+		if err := events.Unmarshal(msg.Data, &in); err != nil {
 			log.Println(err)
+			msg.Respond(reply.Errorf("decode error %v", err))
 			return
 		}
 
-		msg, err := newReplyMsg(msg.Reply, tokenBd.Email)
+		token, err := s.t.GenerateToken(context.Background(), token.WithEnd(5*time.Minute), token.WithPrivateClaims(token.PrivateClaims{"email": in.Email}))
 		if err != nil {
 			log.Println(err)
+			msg.Respond(reply.Errorf("sign token: %v", err))
 			return
 		}
 
-		if err := s.e.Publish(msg); err != nil {
+		// set value
+		reply.Value = token
+		if err := msg.Respond(reply.Bytes()); err != nil {
 			log.Println(err)
-			return
 		}
-
-		log.Println("token generated")
 	}
 }

@@ -26,6 +26,4 @@ func TestDecoding(t *testing.T) {
 
 	err = gob.NewDecoder(bytes.NewReader(buf.Bytes())).Decode(&bar)
 	is.NoErr(err) // decoding pointer
-
-	// is.Equal(*bar.Bar, "hello") // decoding pointer
 }

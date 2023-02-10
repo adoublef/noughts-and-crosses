@@ -23,7 +23,7 @@ func WithRandReader(r io.Reader) ClientOption {
 	}
 }
 
-type TokenClient interface {
+type Client interface {
 	ParseToken(token []byte) (jwt.Token, error)
 	// ParseRequest parses the request and returns the token
 	// if the token is valid, and returns an error otherwise
@@ -80,7 +80,7 @@ func (c *tokenClient) GenerateToken(ctx context.Context, opts ...BuildOption) ([
 	return GenerateToken(ctx, c.key, opts...)
 }
 
-func NewTokenClient(opts ...ClientOption) TokenClient {
+func NewTokenClient(opts ...ClientOption) Client {
 	c := &tokenClient{}
 	for _, opt := range opts {
 		opt(c)

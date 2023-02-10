@@ -23,7 +23,7 @@
 </html>
 
 <script>
-    import { Auth } from "../../lib/agent";
+    import { User } from "@lib/agent";
 
     const form = document.querySelector<HTMLFormElement>("#signup");
 
@@ -32,9 +32,9 @@
 
         const email = new FormData(form).get("email") as string;
 
-        const data = await Auth.signup(email);
+        const data = await User.signup.attempt(email);
 
-        if (!data) {
+        if ("error" in data) {
             alert("Invalid email");
             return;
         }
