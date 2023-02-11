@@ -51,8 +51,8 @@ func (s *Service) routes() {
 }
 
 func (s *Service) listen() {
-	s.e.Conn().Subscribe(events.EventSendLoginConfirm, s.handleLoginConfirm())
-	s.e.Conn().Subscribe(events.EventSendSignupConfirm, s.handleSignupConfirm())
+	s.e.Conn().QueueSubscribe(events.EventSendLoginConfirm, "workers", s.handleLoginConfirm())
+	s.e.Conn().QueueSubscribe(events.EventSendSignupConfirm, "workers", s.handleSignupConfirm())
 }
 
 func (s *Service) handleSignupConfirm() nats.Handler {
