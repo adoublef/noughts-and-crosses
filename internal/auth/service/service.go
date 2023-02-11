@@ -190,6 +190,7 @@ func (s *Service) verifyCreateProfileToken() nats.MsgHandler {
 		if err := msg.Respond(d.Bytes()); err != nil {
 			log.Printf("messages response: %v", err)
 		}
+
 	}
 }
 

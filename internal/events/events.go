@@ -78,6 +78,7 @@ type DataAuthToken struct {
 // 	return &nats.Msg{Subject: EventCreateProfileValidation, Data: p}, nil
 // }
 
+
 // func NewSignupVerifyMsg(token []byte) (*nats.Msg, error) {
 // 	v := DataToken{Token: token}
 // 	p, err := Marshal(v)

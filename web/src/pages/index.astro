@@ -22,3 +22,23 @@ import PingTester from "src/components/PingTester.astro";
         <PingTester />
     </body>
 </html>
+
+<script>
+    import { Ping } from "@lib/agent";
+
+    const input = document.querySelector<HTMLInputElement>("#input")!;
+    const output = document.querySelector<HTMLOutputElement>("#output")!;
+
+    input.addEventListener("input", async (e) => {
+        const { value } = e.currentTarget as HTMLInputElement;
+        if (!value) {
+            output.textContent = `masked: The sum of "${value}": ${0}`;
+            return;
+        }
+
+        const data = await Ping.hello(value);
+        if ("error" in data) return;
+
+        output.textContent = `masked: The sum of "${value}": ${data.sum}`;
+    });
+</script>
