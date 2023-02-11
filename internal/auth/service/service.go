@@ -183,7 +183,6 @@ func (s *Service) verifyCreateProfileToken() nats.MsgHandler {
 
 		if email := tk.PrivateClaims()["email"]; email != payload.Email {
 			msg.Respond(d.Errorf("something went wrong with the verifying identity"))
-
 			return
 		}
 
@@ -217,7 +216,6 @@ func (s *Service) verifySignupToken() nats.MsgHandler {
 		if err := msg.Respond(d.Bytes()); err != nil {
 			log.Printf("messages response: %v", err)
 		}
-
 	}
 }
 
@@ -238,7 +236,6 @@ func (s *Service) generateSignupToken() nats.MsgHandler {
 		if err != nil {
 			// log.Println(err)
 			msg.Respond(d.Errorf("sign token: %v", err))
-
 			return
 		}
 

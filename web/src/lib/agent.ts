@@ -24,7 +24,6 @@ export const Ping = {
  * Does not throw an error, instead returns a 500 response.
  * My API should always return a json object, then can clean this up.
  */
-
 async function send<T>(method: Method, url: string, payload?: any, headers: Record<string, string> = {}): Promise<SendError | T> {
     let opts: RequestInit = { method, headers, mode: "cors" };
 
