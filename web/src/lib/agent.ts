@@ -41,6 +41,7 @@ async function send<T>(method: Method, url: string, payload?: unknown, headers: 
         const { cause } = (err as Error);
         if (!isResponse(cause)) return { error: -1 } as const;
         switch (cause.status) {
+            // TODO handle codes
             default:
                 return { error: cause.status } as const;
         }

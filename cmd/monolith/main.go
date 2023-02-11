@@ -25,11 +25,23 @@ import (
 func run() error {
 	ctx := context.Background()
 
-	nc, err := nats.Connect(conf.NATSURI, nats.UserJWTAndSeed(conf.NATSToken, conf.NATSSeed))
+	nc, err := nats.Connect(conf.NATSURI, nats.UserJWTAndSeed(conf.NATSToken, conf.NATSSeed), nats.ErrorHandler(func(nc *nats.Conn, s *nats.Subscription, err error) {
+		if s != nil {
+			log.Printf("Async error in %q/%q: %v", s.Subject, s.Queue, err)
+		} else {
+			log.Printf("Async error outside subscription: %v", err)
+		}
+	}))
 	if err != nil {
 		return err
 	}
 	defer nc.Close()
+
+	ec, err := nats.NewEncodedConn(nc, nats.GOB_ENCODER)
+	if err != nil {
+		return err
+	}
+	defer ec.Close()
 
 	conn, err := pgxpool.New(ctx, conf.DBURL)
 	if err != nil {
@@ -59,13 +71,13 @@ func run() error {
 		mux.Post("/health", handlePing)
 	}
 
-	msv := newMailingService(nc)
+	msv := newMailingService(ec)
 	mux.Mount("/mail", msv)
 
-	rsv := newRegService(nc, conn)
+	rsv := newRegService(ec, conn)
 	mux.Mount("/registry", rsv)
 
-	asv := newAuthService(nc)
+	asv := newAuthService(ec)
 	mux.Mount("/auth", asv)
 
 	log.Println("Listening on port", conf.PORT)
@@ -78,18 +90,18 @@ func main() {
 	}
 }
 
-func newMailingService(nc *nats.Conn) *mail.Service {
+func newMailingService(nc *nats.EncodedConn) *mail.Service {
 	em := smtp.NewMailer(conf.SMTPUsername, conf.SMTPPassword, conf.SMTPHost, 587)
 	ec := events.NewClient(nc)
 	return mail.New(em, ec)
 }
 
-func newRegService(nc *nats.Conn, pg *pgxpool.Pool) *sreg.Service {
+func newRegService(nc *nats.EncodedConn, pg *pgxpool.Pool) *sreg.Service {
 	ec := events.NewClient(nc)
 	return sreg.New(ec, rreg.New(pg))
 }
 
-func newAuthService(nc *nats.Conn) *auth.Service {
+func newAuthService(nc *nats.EncodedConn) *auth.Service {
 	tk := jsonwebtoken.NewTokenClient()
 	ec := events.NewClient(nc)
 	return auth.New(ec, tk)
