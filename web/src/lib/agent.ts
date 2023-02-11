@@ -1,5 +1,7 @@
 // https://web.dev/fetch-api-error-handling/
 
+import type { Method } from "./api/response";
+
 export const User = {
     create: (token: string, email: string, username: string, bio?: string) => send<{ location: string; username: string; }>("post", "/registry/users", { email, username, bio }, { Authorization: `Bearer ${token}` }),
     signup: {
