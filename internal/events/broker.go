@@ -1,44 +1,41 @@
 package events
 
 import (
-	"time"
-
 	"github.com/nats-io/nats.go"
 )
 
 type Broker interface {
-	// Conn() *nats.Conn
-	Subscribe(subject string, cb nats.MsgHandler)
-	Publish(msg *nats.Msg) error
-	Request(msg *nats.Msg, timeout time.Duration) ([]byte, error)
+	Conn() *nats.EncodedConn
 }
 
 var _ Broker = (*pubsub)(nil)
 
 type pubsub struct {
-	nc *nats.Conn
+	ec *nats.EncodedConn
 }
 
-func NewClient(nc *nats.Conn) Broker {
-	return &pubsub{nc: nc}
+func NewClient(ec *nats.EncodedConn) Broker {
+	return &pubsub{ec: ec}
 }
 
-func (ps *pubsub) Subscribe(subject string, cb nats.MsgHandler) {
-	_, err := ps.nc.Subscribe(subject, cb)
-	if err != nil {
-		panic(err)
-	}
-}
+func (ps *pubsub) Conn() *nats.EncodedConn { return ps.ec }
 
-func (ps *pubsub) Publish(msg *nats.Msg) error {
-	return ps.nc.PublishMsg(msg)
-}
+// func (ps *pubsub) Subscribe(subject string, cb nats.MsgHandler) {
+// 	_, err := ps.ec.Subscribe(subject, cb)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// }
 
-func (ps *pubsub) Request(msg *nats.Msg, timeout time.Duration) ([]byte, error) {
-	m, err := ps.nc.RequestMsg(msg, timeout)
-	if err != nil {
-		return nil, err
-	}
+// func (ps *pubsub) Publish(msg *nats.Msg) error {
+// 	return ps.ec.Conn.PublishMsg(msg)
+// }
 
-	return m.Data, nil
-}
+// func (ps *pubsub) Request(msg *nats.Msg, timeout time.Duration) ([]byte, error) {
+// 	m, err := ps.ec.Conn.RequestMsg(msg, timeout)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return m.Data, nil
+// }

@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/nats-io/nats.go"
 
 	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
+	"github.com/hyphengolang/noughts-and-crosses/internal/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
 )
 
@@ -26,18 +26,18 @@ var (
 )
 
 type Service struct {
-	mux  chi.Router
+	m    service.Router
 	smtp smtp.Mailer
 	e    events.Broker
 }
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+	s.m.ServeHTTP(w, r)
 }
 
 func New(smtp smtp.Mailer, e events.Broker) *Service {
 	s := &Service{
-		mux:  chi.NewRouter(),
+		m:    service.NewRouter(),
 		smtp: smtp,
 		e:    e,
 	}
@@ -51,12 +51,12 @@ func (s *Service) routes() {
 }
 
 func (s *Service) listen() {
-	// response needed from `auth`
-	s.e.Subscribe(events.EventSendLoginConfirm, s.handleLoginConfirm())
-	s.e.Subscribe(events.EventSendSignupConfirm, s.handleSignupConfirm())
+	s.e.Conn().Subscribe(events.EventSendLoginConfirm, s.handleLoginConfirm())
+	s.e.Conn().Subscribe(events.EventSendSignupConfirm, s.handleSignupConfirm())
 }
 
-func (s *Service) handleSignupConfirm() nats.MsgHandler {
+func (s *Service) handleSignupConfirm() nats.Handler {
+
 	type Args struct {
 		Href string
 	}
@@ -68,55 +68,51 @@ func (s *Service) handleSignupConfirm() nats.MsgHandler {
 
 	send := func(to string, token []byte) error {
 		args := &Args{
-			Href: fmt.Sprintf("%s/signup/confirm-email?token=%s", conf.ClientURI, string(token)),
+			Href: fmt.Sprintf("%s/signup/confirm-email?token=%s", s.m.ClientURI(), string(token)),
 		}
 
 		mail, err := render(args, "Signup Confirmation", to)
 		if err != nil {
 			return err
-		}
 
-		return s.smtp.Send(mail)
-	}
-
-	request := func(msg *nats.Msg) (token []byte, err error) {
-		type Data struct{ events.Data[[]byte] }
-
-		msg = events.Redirect(events.EventGenerateSignupToken, msg)
-		raw, err := s.e.Request(msg, 5*time.Second)
-		if err != nil {
-			return
-		}
-
-		var reply Data
-		if err := events.Unmarshal(raw, &reply); err != nil {
-			return nil, err
 		}
 
 		return reply.Value, reply.Err
 	}
 
-	return func(msg *nats.Msg) {
-		var in events.DataSignUpConfirm
-		if err := events.Unmarshal(msg.Data, &in); err != nil {
-			log.Printf("gob decoding: %v", err)
-			return
-		}
+	parseToken := func(msg *events.DataEmail) (email string, token []byte, err error) {
+		type Data struct{ events.Data[[]byte] }
+		var response Data
 
-		token, err := request(msg)
+		err = s.e.Conn().Request(events.EventGenerateSignupToken, msg, &response, 5*time.Second)
 		if err != nil {
-			log.Printf("parsing token: %v", err)
 			return
 		}
 
-		if err := send(in.Email, token); err != nil {
+		if err = response.Err; err != nil {
+			return
+		}
+
+		return msg.Email, response.Value, response.Err
+	}
+
+	return func(msg *events.DataEmail) {
+		_, token, err := parseToken(msg)
+		if err != nil {
+			log.Printf("request result: %v", err)
+			return
+		}
+
+		if err := send(msg.Email, token); err != nil {
+
 			log.Printf("sending email: %v", err)
 			return
 		}
 	}
 }
 
-func (s *Service) handleLoginConfirm() nats.MsgHandler {
+func (s *Service) handleLoginConfirm() nats.Handler {
+
 	type Args struct {
 		Href string
 	}
@@ -139,15 +135,10 @@ func (s *Service) handleLoginConfirm() nats.MsgHandler {
 		return s.smtp.Send(mail)
 	}
 
-	return func(msg *nats.Msg) {
-		var userIn events.DataLoginConfirm
-		if err := events.Unmarshal(msg.Data, &userIn); err != nil {
-			log.Println(err)
-			return
-		}
+	return func(msg *events.DataLoginConfirm) {
+		if err := send(msg.Email, msg.Token); err != nil {
+			log.Printf("sending login email: %v", err)
 
-		if err := send(userIn.Email, userIn.Token); err != nil {
-			log.Printf("sending email error: %v", err)
 			return
 		}
 	}

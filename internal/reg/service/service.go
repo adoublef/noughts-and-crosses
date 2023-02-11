@@ -6,13 +6,20 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	"github.com/hyphengolang/noughts-and-crosses/internal/reg"
 	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
 	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
 )
+
+func uuidParser(r *http.Request, key string) (uuid.UUID, error) {
+	return uuid.Parse(chi.URLParam(r, key))
+}
+
+func uuidFromRequest(r *http.Request) (uuid.UUID, error) {
+	return service.PathParamFromRequest[uuid.UUID](r)
+}
 
 type Service struct {
 	m service.Router
@@ -51,50 +58,37 @@ func (s *Service) routes() {
 }
 
 func (s *Service) handleVerifySignup() http.HandlerFunc {
-	type Data struct {
-		events.Data[string]
-	}
-
-	type response struct {
-		Email string `json:"email"`
-	}
-
-	confirm := func(r *http.Request, token []byte, timeout time.Duration) (email string, err error) {
-		msg, err := events.NewSignupVerifyMsg(token)
+	parseEmail := func(r *http.Request, token []byte, timeout time.Duration) (email string, err error) {
+		var reply struct{ events.Data[string] }
+		err = s.e.Conn().Request(events.EventVerifySignupToken, events.DataToken{Token: token}, &reply, 5*time.Second)
 		if err != nil {
-			return
-		}
-
-		// get the email from token, parsed from auth
-		out, err := s.e.Request(msg, 5*time.Second)
-		if err != nil {
-			return
-		}
-
-		var reply Data
-		if err = events.Unmarshal(out, &reply); err != nil {
 			return
 		}
 
 		return reply.Value, reply.Err
 	}
 
+	type P struct {
+		Email string `json:"email"`
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		token, err := parse.ParseHeader(r)
+		token, err := parse.ParseToken(r)
+
 		if err != nil {
 			// log.Printf("parsing header")
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
 		}
 
-		email, err := confirm(r, token, 5*time.Second)
+		email, err := parseEmail(r, token, 5*time.Second)
+
 		if err != nil {
 			// log.Printf("parsing token")
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
 		}
 
-		p := response{
+		p := P{
 			Email: email,
 		}
 		s.m.Respond(w, r, p, http.StatusOK)
@@ -102,32 +96,26 @@ func (s *Service) handleVerifySignup() http.HandlerFunc {
 }
 
 func (s *Service) handleSignUp() http.HandlerFunc {
-	type request struct {
+	type Q struct {
 		Email string `json:"email"`
 	}
 
-	type response struct {
+	type P struct {
 		Provider string `json:"provider"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		var q request
+		var q Q
 		if err := s.m.Decode(w, r, &q); err != nil {
 			s.m.Respond(w, r, err, http.StatusBadRequest)
 			return
 		}
 
-		msg, err := events.NewSendSignupConfirmMsg(q.Email)
-		if err != nil {
+		if err := s.e.Conn().Publish(events.EventSendSignupConfirm, events.DataEmail{Email: q.Email}); err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
-		if err := s.e.Publish(msg); err != nil {
-			s.m.Respond(w, r, err, http.StatusInternalServerError)
-			return
-		}
-
-		s.m.Respond(w, r, response{
+		s.m.Respond(w, r, P{
 			Provider: parse.ParseDomain(q.Email),
 			// VerificationToken: token,
 		}, http.StatusAccepted)
@@ -143,45 +131,53 @@ func (s *Service) handleSignUp() http.HandlerFunc {
 // NOTE: this means signup confirm only needs email address
 // add username can be provided at this endpoint. decluttering the API a bit
 func (s *Service) handleRegisterProfile() http.HandlerFunc {
-	type Data struct{ events.Data[struct{}] }
-
-	type request struct {
+	type Q struct {
 		Email    string `json:"email"`
 		Username string `json:"username"`
 		Bio      string `json:"bio"`
 	}
 
 	auth := func(w http.ResponseWriter, r *http.Request, email string) error {
-		token, err := parse.ParseHeader(r)
+		type D struct{ events.Data[struct{}] }
+
+		token, err := parse.ParseToken(r)
 		if err != nil {
 			return err
 		}
 
-		msg, err := events.NewCreateProfileValidationMsg(email, token)
+		var data D
+		err = s.e.Conn().Request(events.EventCreateProfileValidation, events.DataAuthToken{Token: token, Email: email}, &data, 5*time.Second)
 		if err != nil {
 			return err
 		}
 
-		// this will be an a gob encoded message so needs to be decoded
-		p, err := s.e.Request(msg, 5*time.Second)
-		if err != nil {
-			return err
-		}
+		return data.Err
 
-		var auth Data
-		if err := events.Unmarshal(p, &auth); err != nil {
-			return err
-		}
+		// msg, err := events.NewCreateProfileValidationMsg(email, token)
+		// if err != nil {
+		// 	return err
+		// }
 
-		return auth.Err
+		// // this will be an a gob encoded message so needs to be decoded
+		// p, err := s.e.Request(msg, 5*time.Second)
+		// if err != nil {
+		// 	return err
+		// }
+
+		// var auth Data
+		// if err := events.Unmarshal(p, &auth); err != nil {
+		// 	return err
+		// }
+
+		// return auth.Err
 	}
 
-	type response struct {
+	type P struct {
 		Username   string `json:"username"`
 		ProfileURL string `json:"profileUrl"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		var q request
+		var q Q
 		if err := s.m.Decode(w, r, &q); err != nil {
 			s.m.Respond(w, r, err, http.StatusBadRequest)
 			return
@@ -205,9 +201,10 @@ func (s *Service) handleRegisterProfile() http.HandlerFunc {
 
 		// TODO: send email to user with verification link
 		// TODO: Update Location header
-		s.m.Respond(w, r, response{
+		s.m.Respond(w, r, P{
 			Username:   q.Username,
-			ProfileURL: conf.ClientURI + "/todo",
+			ProfileURL: s.m.ClientURI() + "/todo",
+
 		}, http.StatusCreated)
 	}
 }
@@ -303,14 +300,6 @@ func (s *Service) handleSetProfile() http.HandlerFunc {
 		// profile created. add location header
 		s.m.Respond(w, r, nil, http.StatusOK)
 	}
-}
-
-func uuidParser(r *http.Request, key string) (uuid.UUID, error) {
-	return uuid.Parse(chi.URLParam(r, key))
-}
-
-func uuidFromRequest(r *http.Request) (uuid.UUID, error) {
-	return service.PathParamFromRequest[uuid.UUID](r)
 }
 
 //  Events

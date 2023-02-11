@@ -16,7 +16,7 @@ var (
 	aud = []string{"client_a"}
 )
 
-func GenerateToken(ctx context.Context, key jwk.Key, opts ...BuildOption) (Token, error) {
+func SignToken(ctx context.Context, key jwk.Key, opts ...BuildOption) (Token, error) {
 	return Build(key, opts...)
 }
 
@@ -120,7 +120,7 @@ func WithSubject(sub string) BuildOption {
 	}
 }
 
-func WithPrivateClaims(claims PrivateClaims) BuildOption {
+func WithClaims(claims PrivateClaims) BuildOption {
 	return func(b *jwt.Builder) {
 		for k, v := range claims {
 			b.Claim(k, v)

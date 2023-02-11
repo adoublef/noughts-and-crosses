@@ -1,4 +1,5 @@
 ---
+import PingTester from "src/components/PingTester.astro";
 // https://slack.com/intl/en-gb/get-started#/createnew
 // https://slack.com/intl/en-gb/get-started#/confirmemail
 ---
@@ -18,12 +19,7 @@
             <a href="/login">Login</a>
         </div>
 
-        <p>This is triggering a masked url</p>
-        <label>
-            <span>Masked</span>
-            <input id="input" type="text" />
-            <output id="output"></output>
-        </label>
+        <PingTester />
     </body>
 </html>
 

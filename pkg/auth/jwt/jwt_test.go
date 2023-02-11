@@ -16,7 +16,7 @@ func TestGenerateToken(t *testing.T) {
 	key, err := jok.ES256Key(nil)
 	is.NoErr(err) // unable to generate jwt key from raw
 
-	_, err = jot.GenerateToken(context.Background(), key, jot.WithEnd(time.Minute), jot.WithSubject("foo@mail.com"))
+	_, err = jot.SignToken(context.Background(), key, jot.WithEnd(time.Minute), jot.WithSubject("foo@mail.com"))
 	is.NoErr(err) // unable to generate token
 }
 
@@ -29,7 +29,7 @@ func TestToken(t *testing.T) {
 
 	token, err := jot.Build(key,
 		jot.WithEnd(time.Minute),
-		jot.WithPrivateClaims(jot.PrivateClaims{
+		jot.WithClaims(jot.PrivateClaims{
 			"email": "test@mail.com",
 		}),
 	)

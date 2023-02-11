@@ -1,3 +1,4 @@
+// https://cs.union.edu/~striegnk/courses/nlp-with-prolog/html/node93.html#:~:text=In%20parsing%2C%20we%20have%20a,correspond%20to%20the%20semantic%20representation.
 package service
 
 import (
@@ -47,45 +48,39 @@ func (s *Service) routes() {
 }
 
 func (s *Service) handleLogin() http.HandlerFunc {
-	type request struct {
+	type Q struct {
 		Email string `json:"email"`
 	}
 
-	type response struct {
+	type P struct {
 		Provider string `json:"provider"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		var q request
+		var q Q
 		if err := s.m.Decode(w, r, &q); err != nil {
 			s.m.Respond(w, r, err, http.StatusBadRequest)
 			return
 		}
 
-		tk, err := s.t.GenerateToken(context.Background(), token.WithEnd(5*time.Minute), token.WithPrivateClaims(token.PrivateClaims{"email": q.Email}))
+		tk, err := s.t.SignToken(r.Context(), token.WithEnd(5*time.Minute), token.WithClaims(token.PrivateClaims{"email": q.Email}))
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
-		msg, err := events.NewSendLoginConfirmMsg(q.Email, tk)
-		if err != nil {
+		if err := s.e.Conn().Publish(events.EventSendLoginConfirm, events.DataLoginConfirm{Email: q.Email, Token: tk}); err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
-		if err := s.e.Publish(msg); err != nil {
-			s.m.Respond(w, r, err, http.StatusInternalServerError)
-			return
-		}
-
-		s.m.Respond(w, r, response{
+		s.m.Respond(w, r, P{
 			Provider: parse.ParseDomain(q.Email),
 		}, http.StatusOK)
 	}
 }
 
 func (s *Service) handleConfirmLogin() http.HandlerFunc {
-	type response struct {
+	type P struct {
 		Username     string  `json:"username"`
 		AccessToken  string  `json:"accessToken"`
 		RefreshToken string  `json:"refreshToken"`
@@ -137,7 +132,7 @@ func (s *Service) handleConfirmLogin() http.HandlerFunc {
 		// 	return
 		// }
 
-		s.m.Respond(w, r, response{
+		s.m.Respond(w, r, P{
 			// AccessToken:  string(accessToken),
 			// RefreshToken: string(refreshToken),
 			Username: "tmp:" + email,
@@ -161,111 +156,96 @@ func (s *Service) handleRefreshToken() http.HandlerFunc {
 
 func (s *Service) listen() {
 	// responds back to `mailing`
-	s.e.Subscribe(events.EventGenerateSignupToken, s.generateSignupToken())
+	s.e.Conn().Subscribe(events.EventGenerateSignupToken, s.generateSignupToken())
 	// responds back to `registry`
-	s.e.Subscribe(events.EventVerifySignupToken, s.verifySignupToken())
+	s.e.Conn().Subscribe(events.EventVerifySignupToken, s.verifySignupToken())
 	// responds back to `registry`
-	s.e.Subscribe(events.EventCreateProfileValidation, s.verifyCreateProfileToken())
+	s.e.Conn().Subscribe(events.EventCreateProfileValidation, s.verifyCreateProfileToken())
 }
 
 func (s *Service) verifyCreateProfileToken() nats.MsgHandler {
-	type Data struct{ events.Data[struct{}] }
+	type D struct{ events.Data[struct{}] }
 
 	return func(msg *nats.Msg) {
-		var result Data
+		var d D
 
-		var data events.DataAuthToken
-		if err := events.Unmarshal(msg.Data, &data); err != nil {
-			p := result.Errorf("failed to decode data: %v", err)
-			msg.Respond(p)
+		var payload events.DataAuthToken
+		if err := events.Unmarshal(msg.Data, &payload); err != nil {
+			msg.Respond(d.Errorf("failed to decode data: %v", err))
 			return
 		}
 
-		tk, err := s.t.ParseToken(data.Token)
+		tk, err := s.t.ParseToken(payload.Token)
 		if err != nil {
-			p := result.Errorf("failed to parse token: %v", err)
-			msg.Respond(p)
+			msg.Respond(d.Errorf("failed to parse token: %v", err))
 			return
 		}
 
-		if email := tk.PrivateClaims()["email"]; email != data.Email {
-			p := result.Errorf("something went wrong with the verifying identity")
-			msg.Respond(p)
+		if email := tk.PrivateClaims()["email"]; email != payload.Email {
+			msg.Respond(d.Errorf("something went wrong with the verifying identity"))
+
 			return
 		}
 
 		// emails match so this is ok!
-		msg.Respond(result.Bytes())
+		if err := msg.Respond(d.Bytes()); err != nil {
+			log.Printf("messages response: %v", err)
+		}
+
 	}
 }
 
 func (s *Service) verifySignupToken() nats.MsgHandler {
-	type Data struct {
-		events.Data[string]
-	}
+	type D struct{ events.Data[string] }
 
 	return func(msg *nats.Msg) {
-		var reply Data
+		var d D
 
-		var in events.DataEmailToken
-		if err := events.Unmarshal(msg.Data, &in); err != nil {
-			msg.Respond(reply.Errorf("decode msg: %v", err))
+		var payload events.DataToken
+		if err := s.e.Conn().Enc.Decode(msg.Subject, msg.Data, &payload); err != nil {
+			msg.Respond(d.Errorf("decode msg: %v", err))
 			return
 		}
 
-		tk, err := s.t.ParseToken(in.Token)
+		jwt, err := s.t.ParseToken(payload.Token)
 		if err != nil {
-			msg.Respond(reply.Errorf("parse token: %v", err))
+			msg.Respond(d.Errorf("parse token: %v", err))
 			return
 		}
 
-		// Could be work checking
-		email := tk.PrivateClaims()["email"].(string)
-		// {
-		reply.Value = email
-		msg.Respond(reply.Bytes())
-		// raw := A{
-		// 	Email: email,
-		// }
-		// p, err := events.Encode(raw)
-		// if err != nil {
-		// 	log.Println(err)
-		// 	return
-		// }
+		d.Value = jwt.PrivateClaims()["email"].(string)
+		if err := msg.Respond(d.Bytes()); err != nil {
+			log.Printf("messages response: %v", err)
+		}
 
-		// if err := msg.Respond(p); err != nil {
-		// 	log.Println(err)
-		// 	return
-		// }
-		// }
-		log.Println("email", email)
 	}
 }
 
 func (s *Service) generateSignupToken() nats.MsgHandler {
-	type Data struct{ events.Data[[]byte] }
+	type D struct{ events.Data[[]byte] }
 
 	return func(msg *nats.Msg) {
-		var reply Data
+		var d D
 
-		var in events.DataSignUpConfirm
-		if err := events.Unmarshal(msg.Data, &in); err != nil {
-			log.Println(err)
-			msg.Respond(reply.Errorf("decode error %v", err))
+		var payload events.DataEmail
+		if err := events.Unmarshal(msg.Data, &payload); err != nil {
+			// log.Println(err)
+			msg.Respond(d.Errorf("decode error %v", err))
 			return
 		}
 
-		token, err := s.t.GenerateToken(context.Background(), token.WithEnd(5*time.Minute), token.WithPrivateClaims(token.PrivateClaims{"email": in.Email}))
+		tk, err := s.t.SignToken(context.Background(), token.WithEnd(5*time.Minute), token.WithClaims(token.PrivateClaims{"email": payload.Email}))
 		if err != nil {
-			log.Println(err)
-			msg.Respond(reply.Errorf("sign token: %v", err))
+			// log.Println(err)
+			msg.Respond(d.Errorf("sign token: %v", err))
+
 			return
 		}
 
 		// set value
-		reply.Value = token
-		if err := msg.Respond(reply.Bytes()); err != nil {
-			log.Println(err)
+		d.Value = tk
+		if err := msg.Respond(d.Bytes()); err != nil {
+			log.Printf("messages response: %v", err)
 		}
 	}
 }
