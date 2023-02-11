@@ -34,14 +34,14 @@ async function send<T>(method: Method, url: string, payload?: any, headers: Reco
         opts.body = JSON.stringify(payload);
     }
 
-    // /*
+    /*
     const controller = new AbortController();
     opts.signal = controller.signal;
 
     // Cancel the fetch request in 1000ms
     // NOTE: add a timeout to function arguments
     setTimeout(() => controller.abort(), 1000);
-    // */
+    */
 
     try {
         const response = await fetch(import.meta.env.PUBLIC_API_URI + url, opts);
