@@ -31,9 +31,9 @@ type Client interface {
 	// ParseCookie parses the cookie and returns the token
 	// if the token is valid, and returns an error otherwise
 	ParseCookie(r *http.Request, cookieName string) (jwt.Token, error)
-	// GenerateToken generates a token with the given duration
+	// SignToken generates a token with the given duration
 	// and subject. The token is signed with the key provided
-	GenerateToken(ctx context.Context, opts ...BuildOption) ([]byte, error)
+	SignToken(ctx context.Context, opts ...BuildOption) ([]byte, error)
 	// BlacklistToken blacklists the token
 	BlacklistToken(ctx context.Context, token jwt.Token) error
 }
@@ -76,8 +76,8 @@ func (c *tokenClient) ParseCookie(r *http.Request, cookieName string) (jwt.Token
 }
 
 // GenerateToken implements TokenClient
-func (c *tokenClient) GenerateToken(ctx context.Context, opts ...BuildOption) ([]byte, error) {
-	return GenerateToken(ctx, c.key, opts...)
+func (c *tokenClient) SignToken(ctx context.Context, opts ...BuildOption) ([]byte, error) {
+	return SignToken(ctx, c.key, opts...)
 }
 
 func NewTokenClient(opts ...ClientOption) Client {

@@ -28,8 +28,8 @@ func ParseDomain(email string) string {
 	}
 }
 
-// ParseHeader parses the Authorization header from the request.
-func ParseHeader(r *http.Request) ([]byte, error) {
+// ParseToken parses the Authorization header from the request.
+func ParseToken(r *http.Request) ([]byte, error) {
 	token := strings.TrimSpace(r.Header.Get("Authorization"))
 	if token == "" {
 		return nil, fmt.Errorf(`empty query (Authorization)`)
