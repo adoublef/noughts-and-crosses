@@ -18,8 +18,6 @@ func TestGeneratePair(t *testing.T) {
 	is.NoErr(err) // unable to generate jwt key from raw
 }
 
-// NOTE FOR EXAMPLE ONLY, THIS KEY IS NOT TO BE USED IN PRODUCTION
-
 func TestGenerateFromSecret(t *testing.T) {
 	is := is.New(t)
 
@@ -34,6 +32,7 @@ func TestGenerateFromSecret(t *testing.T) {
 	})
 
 	t.Run("using env var", func(t *testing.T) {
+		// NOTE FOR EXAMPLE ONLY, THIS KEY IS NOT TO BE USED IN PRODUCTION
 		private := "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIJTOquEY44KTYC5wtBmj+/2XDLT5Q5/b9QxWJ1MN5K+OoAoGCCqGSM49\nAwEHoUQDQgAEyVsiu8IG5oQiNwYX2F7Wh6XD2dMKOTerOmo1YL08O8mMIGyw9qQo\naauid5eOBuv7CtF3bQ6QvsEf6TuiPZwIqQ==\n-----END EC PRIVATE KEY-----"
 
 		k1, err := jwk.ParseKey([]byte(private), jwk.WithPEM(true))
