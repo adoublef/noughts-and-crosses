@@ -1,10 +1,10 @@
 ---
-import { Auth } from "../../lib/agent";
+import { Auth } from "@lib/agent";
 
 const token = Astro.url.searchParams.get("token")!;
 
 // either 200 or 401
-const data = await Auth.loginVerify(token);
+const data = await Auth.login.confirm(token);
 ---
 
 <html lang="en">
@@ -18,15 +18,7 @@ const data = await Auth.loginVerify(token);
     <body>
         <h1>Astro</h1>
         {
-            data ? (
-                <>
-                    <p>Authorized for {data.username}</p>
-                    <p>
-                        Once this feature has been implemented, you be
-                        redirected to the dashboard
-                    </p>
-                </>
-            ) : (
+            "error" in data ? (
                 <>
                     <p>Not authorized</p>
                     <p>
@@ -36,6 +28,14 @@ const data = await Auth.loginVerify(token);
                     <p>
                         Please visit this <a href="/signup">link</a> to create a
                         new profile
+                    </p>
+                </>
+            ) : (
+                <>
+                    <p>Authorized for {data.username}</p>
+                    <p>
+                        Once this feature has been implemented, you be
+                        redirected to the dashboard
                     </p>
                 </>
             )

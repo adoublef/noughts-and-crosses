@@ -1,3 +1,4 @@
+// https://cs.union.edu/~striegnk/courses/nlp-with-prolog/html/node93.html#:~:text=In%20parsing%2C%20we%20have%20a,correspond%20to%20the%20semantic%20representation.
 package service
 
 import (
@@ -10,26 +11,26 @@ import (
 
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
-	jot "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
+	token "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
 
 	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
 )
 
 type Service struct {
-	m  service.Router
-	e  events.Broker
-	tk jot.TokenClient
+	m service.Router
+	e events.Broker
+	t token.Client
 }
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.m.ServeHTTP(w, r)
 }
 
-func New(e events.Broker, tk jot.TokenClient) *Service {
+func New(e events.Broker, t token.Client) *Service {
 	s := &Service{
-		m:  service.NewRouter(),
-		e:  e,
-		tk: tk,
+		m: service.NewRouter(),
+		e: e,
+		t: t,
 	}
 	go s.listen()
 	s.routes()
@@ -47,45 +48,39 @@ func (s *Service) routes() {
 }
 
 func (s *Service) handleLogin() http.HandlerFunc {
-	type request struct {
+	type Q struct {
 		Email string `json:"email"`
 	}
 
-	type response struct {
+	type P struct {
 		Provider string `json:"provider"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		var q request
+		var q Q
 		if err := s.m.Decode(w, r, &q); err != nil {
 			s.m.Respond(w, r, err, http.StatusBadRequest)
 			return
 		}
 
-		tk, err := s.tk.GenerateToken(context.Background(), jot.WithEnd(5*time.Minute), jot.WithPrivateClaims(jot.PrivateClaims{"email": q.Email}))
+		tk, err := s.t.SignToken(r.Context(), token.WithEnd(5*time.Minute), token.WithClaims(token.PrivateClaims{"email": q.Email}))
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
-		msg, err := events.EncodeLoginConfirmMsg(q.Email, tk)
-		if err != nil {
+		if err := s.e.Conn().Publish(events.EventSendLoginConfirm, events.DataLoginConfirm{Email: q.Email, Token: tk}); err != nil {
 			s.m.Respond(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
-		if err := s.e.Publish(msg); err != nil {
-			s.m.Respond(w, r, err, http.StatusInternalServerError)
-			return
-		}
-
-		s.m.Respond(w, r, response{
+		s.m.Respond(w, r, P{
 			Provider: parse.ParseDomain(q.Email),
 		}, http.StatusOK)
 	}
 }
 
 func (s *Service) handleConfirmLogin() http.HandlerFunc {
-	type response struct {
+	type P struct {
 		Username     string  `json:"username"`
 		AccessToken  string  `json:"accessToken"`
 		RefreshToken string  `json:"refreshToken"`
@@ -93,7 +88,7 @@ func (s *Service) handleConfirmLogin() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		tk, err := s.tk.ParseRequest(r)
+		tk, err := s.t.ParseRequest(r)
 		if err != nil {
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
 			return
@@ -137,7 +132,7 @@ func (s *Service) handleConfirmLogin() http.HandlerFunc {
 		// 	return
 		// }
 
-		s.m.Respond(w, r, response{
+		s.m.Respond(w, r, P{
 			// AccessToken:  string(accessToken),
 			// RefreshToken: string(refreshToken),
 			Username: "tmp:" + email,
@@ -160,85 +155,94 @@ func (s *Service) handleRefreshToken() http.HandlerFunc {
 }
 
 func (s *Service) listen() {
-	s.e.Subscribe(events.EventGenerateSignupToken, s.handleGenerateSignUpToken())
-	s.e.Subscribe(events.EventVerifySignupToken, s.handleVerifySignUpToken())
+	// responds back to `mailing`
+	s.e.Conn().Subscribe(events.EventGenerateSignupToken, s.generateSignupToken())
+	// responds back to `registry`
+	s.e.Conn().Subscribe(events.EventVerifySignupToken, s.verifySignupToken())
+	// responds back to `registry`
+	s.e.Conn().Subscribe(events.EventCreateProfileValidation, s.verifyCreateProfileToken())
 }
 
-func (s *Service) handleVerifySignUpToken() nats.MsgHandler {
-	type A struct {
-		Email string
-	}
+func (s *Service) verifyCreateProfileToken() nats.MsgHandler {
+	type D struct{ events.Data[struct{}] }
 
 	return func(msg *nats.Msg) {
-		var tokVal events.DataEmailToken
-		if err := events.Decode(msg.Data, &tokVal); err != nil {
-			log.Println(err)
+		var d D
+
+		var payload events.DataAuthToken
+		if err := events.Unmarshal(msg.Data, &payload); err != nil {
+			msg.Respond(d.Errorf("failed to decode data: %v", err))
 			return
 		}
 
-		tk, err := s.tk.ParseToken(tokVal.Token)
+		tk, err := s.t.ParseToken(payload.Token)
 		if err != nil {
-			log.Println(err)
+			msg.Respond(d.Errorf("failed to parse token: %v", err))
 			return
 		}
 
-		email, _ := tk.PrivateClaims()["email"].(string)
-		{
-			raw := A{
-				Email: email,
-			}
-			p, err := events.Encode(raw)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-
-			if err := msg.Respond(p); err != nil {
-				log.Println(err)
-				return
-			}
+		if email := tk.PrivateClaims()["email"]; email != payload.Email {
+			msg.Respond(d.Errorf("something went wrong with the verifying identity"))
+			return
 		}
 
-		log.Println("email", email)
+		// emails match so this is ok!
+		if err := msg.Respond(d.Bytes()); err != nil {
+			log.Printf("messages response: %v", err)
+		}
+
 	}
 }
 
-func (s *Service) handleGenerateSignUpToken() nats.MsgHandler {
-	// NOTE move to events package when I can thing of a decent abstraction
-	newReplyMsg := func(subj string, email string) (*nats.Msg, error) {
-		encTk, err := s.tk.GenerateToken(context.Background(), jot.WithEnd(5*time.Minute), jot.WithPrivateClaims(jot.PrivateClaims{"email": email}))
-		if err != nil {
-			return nil, err
-		}
-
-		// reply
-		tokenGen := events.DataEmailToken{Token: encTk}
-		p, err := events.Encode(tokenGen)
-		if err != nil {
-			return nil, err
-		}
-
-		return &nats.Msg{Subject: subj, Data: p}, nil
-	}
+func (s *Service) verifySignupToken() nats.MsgHandler {
+	type D struct{ events.Data[string] }
 
 	return func(msg *nats.Msg) {
-		var tokenBd events.DataSignUpConfirm
-		if err := events.Decode(msg.Data, &tokenBd); err != nil {
-			log.Println(err)
+		var d D
+
+		var payload events.DataToken
+		if err := s.e.Conn().Enc.Decode(msg.Subject, msg.Data, &payload); err != nil {
+			msg.Respond(d.Errorf("decode msg: %v", err))
 			return
 		}
 
-		msg, err := newReplyMsg(msg.Reply, tokenBd.Email)
+		jwt, err := s.t.ParseToken(payload.Token)
 		if err != nil {
-			log.Println(err)
+			msg.Respond(d.Errorf("parse token: %v", err))
 			return
 		}
 
-		if err := s.e.Publish(msg); err != nil {
-			log.Println(err)
+		d.Value = jwt.PrivateClaims()["email"].(string)
+		if err := msg.Respond(d.Bytes()); err != nil {
+			log.Printf("messages response: %v", err)
+		}
+	}
+}
+
+func (s *Service) generateSignupToken() nats.MsgHandler {
+	type D struct{ events.Data[[]byte] }
+
+	return func(msg *nats.Msg) {
+		var d D
+
+		var payload events.DataEmail
+		if err := events.Unmarshal(msg.Data, &payload); err != nil {
+			// log.Println(err)
+			msg.Respond(d.Errorf("decode error %v", err))
 			return
 		}
 
-		log.Println("token generated")
+		tk, err := s.t.SignToken(context.Background(), token.WithEnd(5*time.Minute), token.WithClaims(token.PrivateClaims{"email": payload.Email}))
+		if err != nil {
+			// log.Println(err)
+			msg.Respond(d.Errorf("sign token: %v", err))
+			return
+		}
+
+		// set value
+		d.Value = tk
+		if err := msg.Respond(d.Bytes()); err != nil {
+			log.Printf("messages response: %v", err)
+		}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/hyphengolang/noughts-and-crosses/internal/conf"
 	h "github.com/hyphengolang/prelude/http"
 )
 
@@ -19,14 +20,17 @@ type Router interface {
 
 	Log(v ...any)
 	Logf(format string, v ...any)
+
+	ClientURI() string
 }
+
+func (*routerHandler) ClientURI() string { return conf.ClientURI }
 
 func (*routerHandler) Decode(w http.ResponseWriter, r *http.Request, data any) error {
 	return h.Decode(w, r, data)
 }
 
 func (*routerHandler) Respond(w http.ResponseWriter, r *http.Request, data any, status int) {
-	log.Printf("Responding with status %d; body: %v", status, data)
 	h.Respond(w, r, data, status)
 }
 
