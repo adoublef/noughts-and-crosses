@@ -16,7 +16,7 @@ import (
 	rreg "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
 	sreg "github.com/hyphengolang/noughts-and-crosses/internal/reg/service"
 	"github.com/hyphengolang/noughts-and-crosses/internal/smtp"
-	jsonwebtoken "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
+	token "github.com/hyphengolang/noughts-and-crosses/pkg/auth/jwt"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/rs/cors"
@@ -102,7 +102,7 @@ func newRegService(nc *nats.EncodedConn, pg *pgxpool.Pool) *sreg.Service {
 }
 
 func newAuthService(nc *nats.EncodedConn) *auth.Service {
-	tk := jsonwebtoken.NewTokenClient()
+	tk := token.NewTokenClient(token.WithPEM(conf.JWTSecret))
 	ec := events.NewClient(nc)
 	return auth.New(ec, tk)
 }
