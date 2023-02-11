@@ -56,6 +56,7 @@ func (s *Service) listen() {
 }
 
 func (s *Service) handleSignupConfirm() nats.Handler {
+
 	type Args struct {
 		Href string
 	}
@@ -73,9 +74,10 @@ func (s *Service) handleSignupConfirm() nats.Handler {
 		mail, err := render(args, "Signup Confirmation", to)
 		if err != nil {
 			return err
+
 		}
 
-		return s.smtp.Send(mail)
+		return reply.Value, reply.Err
 	}
 
 	parseToken := func(msg *events.DataEmail) (email string, token []byte, err error) {
@@ -102,6 +104,7 @@ func (s *Service) handleSignupConfirm() nats.Handler {
 		}
 
 		if err := send(msg.Email, token); err != nil {
+
 			log.Printf("sending email: %v", err)
 			return
 		}
@@ -109,6 +112,7 @@ func (s *Service) handleSignupConfirm() nats.Handler {
 }
 
 func (s *Service) handleLoginConfirm() nats.Handler {
+
 	type Args struct {
 		Href string
 	}
@@ -134,6 +138,7 @@ func (s *Service) handleLoginConfirm() nats.Handler {
 	return func(msg *events.DataLoginConfirm) {
 		if err := send(msg.Email, msg.Token); err != nil {
 			log.Printf("sending login email: %v", err)
+
 			return
 		}
 	}

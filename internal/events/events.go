@@ -47,6 +47,7 @@ type DataJWTToken struct {
 
 // DatEmail could be a `string` type alias
 type DataEmail struct {
+
 	Email string
 }
 
@@ -68,6 +69,7 @@ type DataAuthToken struct {
 
 // TODO implement Error interface
 
+
 // func NewCreateProfileValidationMsg(email string, token []byte) (*nats.Msg, error) {
 // 	v := DataAuthToken{Token: token, Email: email}
 // 	p, err := Marshal(v)
@@ -77,6 +79,7 @@ type DataAuthToken struct {
 
 // 	return &nats.Msg{Subject: EventCreateProfileValidation, Data: p}, nil
 // }
+
 
 // func NewSignupVerifyMsg(token []byte) (*nats.Msg, error) {
 // 	v := DataToken{Token: token}

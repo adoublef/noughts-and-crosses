@@ -73,6 +73,7 @@ func (s *Service) handleVerifySignup() http.HandlerFunc {
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, err := parse.ParseToken(r)
+
 		if err != nil {
 			// log.Printf("parsing header")
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
@@ -80,6 +81,7 @@ func (s *Service) handleVerifySignup() http.HandlerFunc {
 		}
 
 		email, err := parseEmail(r, token, 5*time.Second)
+
 		if err != nil {
 			// log.Printf("parsing token")
 			s.m.Respond(w, r, err, http.StatusUnauthorized)
@@ -202,6 +204,7 @@ func (s *Service) handleRegisterProfile() http.HandlerFunc {
 		s.m.Respond(w, r, P{
 			Username:   q.Username,
 			ProfileURL: s.m.ClientURI() + "/todo",
+
 		}, http.StatusCreated)
 	}
 }
