@@ -1,5 +1,7 @@
 // https://web.dev/fetch-api-error-handling/
 
+import type { Method } from "./api/response";
+
 export const User = {
     create: (token: string, email: string, username: string, bio?: string) => send<{ location: string; username: string; }>("post", "/registry/users", { email, username, bio }, { Authorization: `Bearer ${token}` }),
     signup: {
@@ -32,14 +34,14 @@ async function send<T>(method: Method, url: string, payload?: any, headers: Reco
         opts.body = JSON.stringify(payload);
     }
 
-    // /*
+    /*
     const controller = new AbortController();
     opts.signal = controller.signal;
 
     // Cancel the fetch request in 1000ms
     // NOTE: add a timeout to function arguments
     setTimeout(() => controller.abort(), 1000);
-    // */
+    */
 
     try {
         const response = await fetch(import.meta.env.PUBLIC_API_URI + url, opts);
