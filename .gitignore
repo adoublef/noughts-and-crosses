@@ -25,3 +25,6 @@ go.work
 
 # Private directory
 private
+
+# CockroachDB testing
+internal/reg/repository/cockroach
