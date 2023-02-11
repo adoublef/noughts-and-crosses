@@ -106,7 +106,3 @@ type SystemError = {
 export function isSystemError(err: any): err is SystemError {
     return err?.code === "ECONNREFUSED";
 }
-
-const methods = ["get", "post", "put", "delete"] as const;
-export type Method = typeof methods[number];
-
