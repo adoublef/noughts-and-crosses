@@ -45,7 +45,8 @@ type DataJWTToken struct {
 	Token jwt.Token
 }
 
-type DataSignUpConfirm struct {
+// DatEmail could be a `string` type alias
+type DataEmail struct {
 	Email string
 }
 
@@ -54,10 +55,12 @@ type DataLoginConfirm struct {
 	Token []byte
 }
 
-type DataEmailToken struct {
+// NOTE DataToken could be a `[]byte` type alias
+type DataToken struct {
 	Token []byte
 }
 
+// NOTE This data type is the same as `DataLoginConfirm` so not exactly DRY
 type DataAuthToken struct {
 	Token []byte
 	Email string
@@ -65,46 +68,46 @@ type DataAuthToken struct {
 
 // TODO implement Error interface
 
-func NewCreateProfileValidationMsg(email string, token []byte) (*nats.Msg, error) {
-	v := DataAuthToken{Token: token, Email: email}
-	p, err := Marshal(v)
-	if err != nil {
-		return nil, err
-	}
+// func NewCreateProfileValidationMsg(email string, token []byte) (*nats.Msg, error) {
+// 	v := DataAuthToken{Token: token, Email: email}
+// 	p, err := Marshal(v)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return &nats.Msg{Subject: EventCreateProfileValidation, Data: p}, nil
-}
+// 	return &nats.Msg{Subject: EventCreateProfileValidation, Data: p}, nil
+// }
 
-func NewSignupVerifyMsg(token []byte) (*nats.Msg, error) {
-	v := DataEmailToken{Token: token}
-	p, err := Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	// Request from Auth service to get token from header.
-	return &nats.Msg{Subject: EventVerifySignupToken, Data: p}, nil
-}
+// func NewSignupVerifyMsg(token []byte) (*nats.Msg, error) {
+// 	v := DataToken{Token: token}
+// 	p, err := Marshal(v)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	// Request from Auth service to get token from header.
+// 	return &nats.Msg{Subject: EventVerifySignupToken, Data: p}, nil
+// }
 
-func NewSendSignupConfirmMsg(email string) (*nats.Msg, error) {
-	// send email to complete sign-up process
-	// automatically check which email provider so
-	// can send a link to the correct email provider
-	// https://www.freecodecamp.org/news/the-best-free-email-providers-2021-guide-to-online-email-account-services/
-	data := DataSignUpConfirm{Email: email}
-	p, err := Marshal(data)
-	if err != nil {
-		return nil, err
-	}
+// func NewSendSignupConfirmMsg(email string) (*nats.Msg, error) {
+// 	// send email to complete sign-up process
+// 	// automatically check which email provider so
+// 	// can send a link to the correct email provider
+// 	// https://www.freecodecamp.org/news/the-best-free-email-providers-2021-guide-to-online-email-account-services/
+// 	data := DataEmail{Email: email}
+// 	p, err := Marshal(data)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return &nats.Msg{Subject: EventSendSignupConfirm, Data: p}, nil
-}
+// 	return &nats.Msg{Subject: EventSendSignupConfirm, Data: p}, nil
+// }
 
-func NewSendLoginConfirmMsg(email string, token []byte) (*nats.Msg, error) {
-	data := DataLoginConfirm{Email: email, Token: token}
-	p, err := Marshal(data)
-	if err != nil {
-		return nil, err
-	}
+// func NewSendLoginConfirmMsg(email string, token []byte) (*nats.Msg, error) {
+// 	data := DataLoginConfirm{Email: email, Token: token}
+// 	p, err := Marshal(data)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return &nats.Msg{Subject: EventSendLoginConfirm, Data: p}, nil
-}
+// 	return &nats.Msg{Subject: EventSendLoginConfirm, Data: p}, nil
+// }
