@@ -7,8 +7,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/hyphengolang/noughts-and-crosses/internal/events"
-	"github.com/hyphengolang/noughts-and-crosses/internal/reg"
-	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
+	"github.com/hyphengolang/noughts-and-crosses/internal/registry"
+	repo "github.com/hyphengolang/noughts-and-crosses/internal/registry/repository"
 	"github.com/hyphengolang/noughts-and-crosses/internal/service"
 	"github.com/hyphengolang/noughts-and-crosses/pkg/parse"
 )
@@ -204,7 +204,6 @@ func (s *Service) handleRegisterProfile() http.HandlerFunc {
 		s.m.Respond(w, r, P{
 			Username:   q.Username,
 			ProfileURL: s.m.ClientURI() + "/todo",
-
 		}, http.StatusCreated)
 	}
 }

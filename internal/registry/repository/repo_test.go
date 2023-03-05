@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyphengolang/noughts-and-crosses/internal/docker"
-	repo "github.com/hyphengolang/noughts-and-crosses/internal/reg/repository"
+	repo "github.com/hyphengolang/noughts-and-crosses/internal/registry/repository"
 	"github.com/hyphengolang/prelude/testing/is"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	pg "github.com/hyphengolang/noughts-and-crosses/internal/postgres"
-	"github.com/hyphengolang/noughts-and-crosses/internal/reg"
+	"github.com/hyphengolang/noughts-and-crosses/internal/registry"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
