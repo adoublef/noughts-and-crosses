@@ -1,3 +1,4 @@
+import { useWebsocket } from "@/lib/websockets";
 import { ButtonHTMLAttributes, HTMLAttributes, MouseEventHandler, useCallback, useEffect, useRef, useState } from "react";
 import { GamePad } from "./GamePad";
 import { CSS } from "./styles";
@@ -45,6 +46,7 @@ export function GameBoard(props: GameBoardProps) {
     </>);
 }
 
+/** this will be generated during onconnect */
 const initState = {
     board: [
         0, 0, 0,
@@ -56,9 +58,9 @@ const initState = {
         { id: "foo", value: 1 },
         { id: "bar", value: 2 },
     ],
-} satisfies InitState;
+} satisfies GameBoardState;
 
-type InitState = {
+type GameBoardState = {
     board: Board;
     current: Client;
     clients: [Client] | [Client, Client];
@@ -68,19 +70,45 @@ export const useGameBoard = (url: string) => {
     const [current, setCurrent] = useState(initState.clients[0] as Client);
     const [board, setBoard] = useState(initState.board as Board);
     const [clients, _setClients] = useState(initState.clients as [Client] | [Client, Client]);
+
     const [send, connected] = useWebsocket(url, (ws, parse) => {
-        ws.onopen = () => console.log("connected");
-        ws.onmessage = event => console.log("message", parse(event.data));
+        ws.onopen = () => {
+            send({ type: "connect" });
+        };
+
+        ws.onmessage = event => {
+            const message = parse<{ type: string, payload: any; }>(event.data);
+
+            switch (message.type) {
+                case "connect":
+                    console.log("connected");
+                    break;
+                case "move":
+                    console.log("move", message.payload);
+                    break;
+                case "reset":
+                    setBoard(message.payload.board);
+                    break;
+                default:
+                    console.log("unknown message", message);
+            }
+        };
+
         ws.onclose = () => console.log("disconnected");
     }, []);
 
 
     function onMove(_value: number, index: number): MouseEventHandler<HTMLButtonElement> {
         return () => {
-            const data = {
+            const move = {
                 type: "move",
+                payload: {
+                    index,
+                    value: current.value,
+                },
             };
-            send(data);
+
+            send(move);
 
             setBoard(prev => prev.map((pValue, pIndex) => {
                 if (pIndex !== index) return pValue;
@@ -91,7 +119,9 @@ export const useGameBoard = (url: string) => {
         };// NOTE -- a map is 1:1 so this is safe
     };
 
-    function onReset() { setBoard([0, 0, 0, 0, 0, 0, 0, 0, 0]); }
+    function onReset() {
+        send({ type: "reset", payload: { board: [0, 0, 0, 0, 0, 0, 0, 0, 0] } });
+    }
 
     // hoisting for webSocket.onmessage, webSocket.onopen, webSocket.onclose to use state
     function onOpen() { console.log("connected"); }
@@ -121,26 +151,3 @@ const evaluate = (board: Board) => (acc: Value, [a, b, c]: Combination) => {
     return (board[a] === board[b] && board[a] === board[c]) ? board[a] : acc;
 };
 
-const useWebsocket = (url: string, callbackfn: (webSocket: WebSocket, parse: <T = any>(data: string) => T) => void, deps: any[]) => {
-    const [connected, setConnected] = useState(false);
-    const memofn = useCallback(callbackfn, deps);
-    const webSocket = useRef<WebSocket>();
-
-    useEffect(() => {
-        const current = new WebSocket(url);
-
-        callbackfn(current, function parse<T = any>(data: string) { return JSON.parse(data) as T; });
-
-        webSocket.current = current;
-
-        return () => {
-            current.close();
-        };
-    }, [url, memofn]);
-
-
-    function send(data: Record<string, any>) { webSocket.current?.send(JSON.stringify(data)); }
-
-
-    return [send, connected] as [send: typeof send, connected: boolean];
-};
