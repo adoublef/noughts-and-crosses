@@ -1,0 +1,10 @@
+version: '3.5'
+
+services:
+  api:
+    env_file:
+      - .env
+    build:
+      context: ./
+    ports:
+      - 8080:8080
